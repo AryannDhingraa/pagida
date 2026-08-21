@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: typecheck, lint, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build the extension
+        run: npm run build
+
+      - name: Check the packaged size
+        run: |
+          cd dist && zip -qr ../pagida.zip . && cd ..
+          SIZE=$(stat -c%s pagida.zip)
+          echo "packaged: $SIZE bytes"
+          # A phishing detector that ships megabytes of code is a phishing
+          # detector nobody will audit. Fail the build if it bloats.
+          test "$SIZE" -lt 1000000
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pagida-unpacked
+          path: dist/

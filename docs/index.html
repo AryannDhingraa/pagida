@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pagida — a phishing detector that shows its working</title>
+<meta name="description" content="Open-source Chrome extension that scores every page for phishing risk against 37 rules and tells you exactly which warning signs it found. Runs locally, sends nothing.">
+<link rel="icon" href="img/icon.png">
+<meta property="og:title" content="Pagida — a phishing detector that shows its working">
+<meta property="og:description" content="Every page gets a risk score out of 100, and every point traces back to a named warning sign you can read for yourself.">
+<meta property="og:image" content="img/popup-danger.png">
+<style>
+:root{
+  --bg:#0B0E11; --panel:#12171C; --panel-2:#171E24; --line:#1F272F;
+  --fg:#D8E2E8; --fg-2:#A2B0BA; --fg-dim:#6F808C;
+  --green:#4ADE80; --amber:#F5B740; --red:#F87171; --blue:#56C7F0;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:400 15px/1.65 var(--mono);-webkit-font-smoothing:antialiased}
+.wrap{max-width:940px;margin:0 auto;padding:0 24px 100px}
+a{color:var(--amber);text-underline-offset:3px}
+h1,h2,h3{letter-spacing:-.01em}
+code{background:var(--panel-2);border:1px solid var(--line);border-radius:3px;padding:1px 5px;font-size:.88em}
+pre{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:16px 18px;overflow-x:auto;font-size:13px;margin:18px 0}
+pre code{background:none;border:0;padding:0}
+
+header{text-align:center;padding:76px 0 52px}
+header img{width:84px;height:84px;image-rendering:auto}
+header h1{font-size:clamp(2.4rem,7vw,3.6rem);margin:22px 0 6px;letter-spacing:.16em;font-weight:700}
+.greek{color:var(--fg-dim);font-size:13px;letter-spacing:.06em;margin:0 0 22px}
+.tagline{font-size:1.12rem;color:var(--fg-2);max-width:60ch;margin:0 auto 34px}
+.cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.cta a{
+  display:inline-block;text-decoration:none;padding:11px 20px;border-radius:4px;
+  border:1px solid var(--line);color:var(--fg-2);font-size:13.5px;letter-spacing:.04em;
+  transition:border-color .15s,color .15s,background .15s;
+}
+.cta a:hover{border-color:var(--fg-dim);color:var(--fg)}
+.cta a.primary{border-color:var(--amber);color:var(--amber)}
+.cta a.primary:hover{background:rgba(245,183,64,.08)}
+
+.shot{display:block;margin:56px auto 0;max-width:100%;border:1px solid var(--line);border-radius:6px}
+.shot.narrow{max-width:360px}
+
+section{padding-top:72px}
+h2{font-size:1.42rem;margin:0 0 8px;font-weight:700}
+.lede{color:var(--fg-2);max-width:66ch;margin:0 0 22px}
+p{max-width:66ch}
+
+.quote{
+  border-left:3px solid var(--red);background:rgba(248,113,113,.06);
+  padding:14px 18px;border-radius:0 4px 4px 0;margin:22px 0;font-size:14px;
+}
+.quote b{color:var(--red)}
+.quote span{color:var(--fg-dim);display:block;margin-top:4px;font-size:13px}
+
+.grid{display:grid;gap:16px;margin-top:24px}
+@media(min-width:720px){.grid{grid-template-columns:repeat(3,1fr)}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:20px}
+.card h3{margin:0 0 8px;font-size:14px;letter-spacing:.06em;color:var(--fg)}
+.card p{margin:0;font-size:13px;color:var(--fg-dim)}
+.card .n{font-size:26px;font-weight:700;color:var(--amber);line-height:1;display:block;margin-bottom:10px;font-variant-numeric:tabular-nums}
+
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin-top:20px}
+th{text-align:left;color:var(--fg-dim);font-weight:400;font-size:11px;letter-spacing:.12em;text-transform:uppercase;padding:10px 12px;border-bottom:1px solid var(--line)}
+td{padding:10px 12px;border-bottom:1px solid var(--panel-2);color:var(--fg-2)}
+td:first-child{color:var(--fg)}
+td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tw{overflow-x:auto}
+
+ul{padding-left:20px;max-width:66ch;color:var(--fg-2)}
+li{margin-bottom:8px}
+li::marker{color:var(--fg-dim)}
+
+footer{margin-top:88px;padding-top:26px;border-top:1px solid var(--line);color:var(--fg-dim);font-size:13px;display:flex;gap:22px;flex-wrap:wrap}
+footer a{color:var(--fg-dim)}
+footer a:hover{color:var(--fg)}
+:focus-visible{outline:2px solid var(--amber);outline-offset:3px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <img src="img/icon.png" alt="">
+  <h1>PAGIDA</h1>
+  <p class="greek">παγίδα — Greek for "trap"</p>
+  <p class="tagline">A phishing detector for Chrome that shows its working. Every page gets a risk score out of 100, and every point of that score traces back to a warning sign you can read for yourself.</p>
+  <div class="cta">
+    <a class="primary" href="https://github.com/AryanDhingraa/pagida#install">Install from source</a>
+    <a href="https://github.com/AryanDhingraa/pagida">Source on GitHub</a>
+    <a href="https://github.com/AryanDhingraa/pagida/blob/main/EVALUATION.md">Read the evaluation</a>
+  </div>
+  <img class="shot narrow" src="img/popup-danger.png" alt="Pagida flagging a phishing page with a score of 92 and a full breakdown of every signal that fired">
+</header>
+
+<section>
+  <h2>Verdicts you can argue with</h2>
+  <p class="lede">Most phishing tools hand you a colour. Pagida hands you the reasoning, in the same words you would use to explain it to someone else.</p>
+  <div class="quote">
+    <b>Login form sends your password elsewhere &nbsp;+32</b>
+    <span>The password box on this page submits to collector-node4.tk, not to verify-account.tk. That is how stolen credentials are collected.</span>
+  </div>
+  <div class="quote">
+    <b>Domain registered 3 days ago &nbsp;+30</b>
+    <span>Almost all phishing sites run on brand-new domains. A week-old domain asking for a login is a serious warning.</span>
+  </div>
+  <p>You can disagree with it. You can learn from it. Both are worth more than a number.</p>
+</section>
+
+<section>
+  <h2>Measured, not asserted</h2>
+  <p class="lede">The repository ships an evaluation harness you can run yourself. It scores today's confirmed-phishing feed against 2,000 legitimate sites and 40 real brand login pages, using the same engine the extension runs.</p>
+  <div class="grid">
+    <div class="card"><span class="n">97.8%</span><h3>PRECISION</h3><p>At the band where Pagida escalates its badge. Two false positives across 2,040 legitimate URLs.</p></div>
+    <div class="card"><span class="n">62.7%</span><h3>RECALL</h3><p>At the flagging band, from the address alone — no page content, no blocklist.</p></div>
+    <div class="card"><span class="n">0</span><h3>FALSE POSITIVES</h3><p>Across 40 real brand login URLs: PayPal, myGov, CommBank, Microsoft, AWS.</p></div>
+  </div>
+  <div class="tw">
+  <table>
+    <thead><tr><th>Band</th><th>Threshold</th><th>Precision</th><th>Recall</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td>WORTH_A_LOOK</td><td class="num">≥15</td><td class="num">94.5%</td><td class="num">62.7%</td><td>Small badge</td></tr>
+      <tr><td>SUSPICIOUS</td><td class="num">≥30</td><td class="num">97.8%</td><td class="num">30.3%</td><td>Escalated badge</td></tr>
+      <tr><td>LIKELY_PHISHING</td><td class="num">≥55</td><td class="num">100%</td><td class="num">2.3%</td><td>Warning bar on the page</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>Only the top band interrupts you, and it is set where address heuristics alone effectively cannot reach it — a warning that fires on one site in forty is a warning people learn to click through.</p>
+</section>
+
+<section>
+  <h2>Nothing leaves your machine by default</h2>
+  <p class="lede">Two optional lookups, both switchable off, neither carrying a page you visited.</p>
+  <ul>
+    <li><b>rdap.org</b> receives the domain name only — <code>example.com</code>, never the path or query string — to find out how old it is. Cached for a week.</li>
+    <li><b>raw.githubusercontent.com</b> serves the OpenPhish public blocklist once every 12 hours. Matching then happens on your machine.</li>
+    <li><b>Google Safe Browsing</b> is off by default, because it is the one lookup that would send full addresses to a third party. If you want it, you supply your own key.</li>
+  </ul>
+  <p>No analytics, no account, no server, no sync, no telemetry. The extension does not request the <code>tabs</code> permission and cannot read your history.</p>
+  <img class="shot" src="img/options-danger.png" alt="Pagida's options page, showing detection settings, the two network lookups with plain-English explanations, and the list of sites the user has judged">
+</section>
+
+<section>
+  <h2>Your judgement beats the score</h2>
+  <p class="lede">Report a site as phishing and Pagida warns you about it from then on. Mark one as safe and it stops scoring it entirely. Right-click any link to check it without opening it.</p>
+  <img class="shot" src="img/link-danger.png" alt="The link checker scoring a link without opening it, showing the full signal breakdown">
+</section>
+
+<section>
+  <h2>Install</h2>
+  <pre><code>git clone https://github.com/AryanDhingraa/pagida.git
+cd pagida
+npm install
+npm run build</code></pre>
+  <p>Open <code>chrome://extensions</code>, turn on Developer mode, click Load unpacked, and select the <code>dist</code> folder. Chrome Web Store listing is in review.</p>
+</section>
+
+<footer>
+  <a href="https://github.com/AryanDhingraa/pagida">GitHub</a>
+  <a href="https://github.com/AryanDhingraa/pagida/blob/main/PRIVACY.md">Privacy policy</a>
+  <a href="https://github.com/AryanDhingraa/pagida/blob/main/THREAT-MODEL.md">Threat model</a>
+  <a href="https://github.com/AryanDhingraa/pagida/blob/main/EVALUATION.md">Evaluation</a>
+  <span>MIT © Aryan Dhingra</span>
+</footer>
+
+</div>
+</body>
+</html>

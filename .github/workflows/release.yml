@@ -1,0 +1,28 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - name: Package
+        run: cd dist && zip -qr "../pagida-${GITHUB_REF_NAME}.zip" .
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: pagida-*.zip
+          generate_release_notes: true
