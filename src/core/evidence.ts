@@ -3,7 +3,7 @@
  * call on a URL you have never visited — which is what the right-click
  * "check this link" feature relies on.
  */
-import type { PageEvidence } from './types.js';
+import type { DomEvidence, PageEvidence } from './types.js';
 import { parseHost } from './util/domain.js';
 
 /** Schemes we have nothing useful to say about. */
@@ -43,4 +43,32 @@ export function evidenceFromUrl(url: string): PageEvidence | null {
     // URL.username is populated when the address carries `user:pass@host`.
     hasEmbeddedCredentials: u.username.length > 0 || u.password.length > 0,
   };
+}
+
+/**
+ * A short fingerprint of the things the engine actually scores on a page.
+ *
+ * The content script uses this to decide whether a DOM mutation is worth
+ * re-scoring. Without it, any page with an ad carousel or a live region
+ * re-reports continuously — which in an early build meant eight scores and
+ * eight domain lookups for a single page load.
+ *
+ * Floats are quantised so that a one-pixel layout shift, which nudges the
+ * dead-link ratio by a rounding error, does not read as a change.
+ */
+export function evidenceSignature(url: string, dom: DomEvidence): string {
+  return [
+    url,
+    dom.hasPasswordField ? 1 : 0,
+    dom.passwordFormActions.join('|'),
+    dom.crossOriginPasswordForm ? 1 : 0,
+    dom.insecurePasswordFormAction ? 1 : 0,
+    dom.hiddenIframeCount,
+    dom.brandTokens.join(','),
+    dom.externalFavicon ? 1 : 0,
+    dom.pasteBlocked ? 1 : 0,
+    dom.contextMenuBlocked ? 1 : 0,
+    Math.round(dom.obfuscationScore * 20),
+    Math.round(dom.deadLinkRatio * 20),
+  ].join('~');
 }

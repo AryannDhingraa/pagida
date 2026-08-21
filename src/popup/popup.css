@@ -60,6 +60,7 @@ body { width: 360px; }
 
 .state { padding: 18px 14px; }
 .state p { margin: 0; font-size: 11.5px; }
+.state p.warn, .sig-head.warn { color: var(--suspicious); }
 
 /* --- actions -------------------------------------------------------------- */
 

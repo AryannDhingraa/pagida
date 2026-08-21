@@ -2,52 +2,83 @@
  * Content script entry point.
  *
  * Extracts page signals once the page settles, hands them to the service worker,
- * and renders the warning bar if the worker asks for one. It re-checks on
- * single-page-app navigations, because a phishing kit that swaps in a login
- * screen without a page load would otherwise be scored on the wrong content.
+ * and renders the warning bar if the worker asks for one.
+ *
+ * The re-scanning here is deliberately conservative. An earlier version simply
+ * re-reported whenever the DOM mutated and a password field was present, which
+ * on any page with an ad carousel or a live region meant scoring the same page
+ * over and over — burning CPU and firing a fresh RDAP lookup each time. It now
+ * re-reports only when something the engine would actually score has changed,
+ * and never more than a handful of times per page.
  */
 import { extractDomEvidence } from './extract.js';
 import { hideBanner, showBanner } from './banner.js';
+import { evidenceSignature } from '../core/evidence.js';
 import type { Message } from '../shared/messages.js';
 
-let lastUrl = location.href;
-let scheduled = false;
+/** Upper bound on reports per page load, regardless of how busy the DOM is. */
+const MAX_REPORTS_PER_PAGE = 4;
+const SETTLE_MS = 400;
 
-function report(): void {
-  scheduled = false;
+let lastUrl = location.href;
+/** Fingerprint of the last evidence we sent, so identical re-scans are dropped. */
+let lastSignature = '';
+let reportCount = 0;
+let timer: ReturnType<typeof setTimeout> | undefined;
+
+function report(force = false): void {
+  timer = undefined;
+  if (!force && reportCount >= MAX_REPORTS_PER_PAGE) return;
   try {
     const dom = extractDomEvidence();
-    void chrome.runtime.sendMessage({ type: 'PAGE_SIGNALS', url: location.href, dom } satisfies Message);
+    const signature = evidenceSignature(location.href, dom);
+    if (!force && signature === lastSignature) return;
+
+    lastSignature = signature;
+    reportCount++;
+    void chrome.runtime.sendMessage({
+      type: 'PAGE_SIGNALS', url: location.href, dom,
+    } satisfies Message);
   } catch {
     // The worker may be asleep or the extension reloading. Nothing to do.
   }
 }
 
-function schedule(delay = 400): void {
-  if (scheduled) return;
-  scheduled = true;
-  setTimeout(report, delay);
+function schedule(delay = SETTLE_MS, force = false): void {
+  if (timer !== undefined) clearTimeout(timer);
+  timer = setTimeout(() => report(force), delay);
 }
 
 // Initial pass once the page has had a moment to render.
 if (document.readyState === 'complete') schedule(150);
 else window.addEventListener('load', () => schedule(150), { once: true });
 
-// Catch SPA navigations and late-injected login forms.
+/**
+ * Catch two things only: a single-page-app navigation, and a credential form
+ * appearing that was not there when we last looked. Everything else is noise.
+ */
+let sawPasswordField = false;
 const observer = new MutationObserver(() => {
   if (location.href !== lastUrl) {
     lastUrl = location.href;
+    lastSignature = '';
+    reportCount = 0;
+    sawPasswordField = false;
     hideBanner();
     schedule(500);
     return;
   }
-  if (document.querySelector('input[type="password"]')) schedule(800);
+  const hasPassword = document.querySelector('input[type="password"]') !== null;
+  if (hasPassword && !sawPasswordField) {
+    sawPasswordField = true;
+    schedule(600);
+  }
 });
 if (document.documentElement) {
   observer.observe(document.documentElement, { childList: true, subtree: true });
 }
 
-chrome.runtime.onMessage.addListener((msg: Message) => {
+chrome.runtime.onMessage.addListener((msg: Message, _sender, sendResponse) => {
   if (msg.type === 'SHOW_BANNER') {
     showBanner(msg.verdict, () => {
       void chrome.runtime.sendMessage({
@@ -56,5 +87,14 @@ chrome.runtime.onMessage.addListener((msg: Message) => {
     });
   } else if (msg.type === 'HIDE_BANNER') {
     hideBanner();
+  } else if (msg.type === 'RESCAN') {
+    // The popup asks for this when the service worker has no verdict for the
+    // tab — after a worker restart, or after the extension was reloaded while
+    // the page stayed open. Without it the popup silently degrades to an
+    // address-only score and the page tier is never applied.
+    report(true);
+    sendResponse({ ok: true });
+    return true;
   }
+  return undefined;
 });

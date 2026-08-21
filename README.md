@@ -13,7 +13,7 @@ black box, no account, no server, nothing sent anywhere by default.
 [![CI](https://github.com/AryanDhingraa/pagida/actions/workflows/ci.yml/badge.svg)](https://github.com/AryanDhingraa/pagida/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Manifest V3](https://img.shields.io/badge/manifest-v3-blue.svg)](src/manifest.json)
-[![Tests](https://img.shields.io/badge/tests-72%20passing-brightgreen.svg)](test)
+[![Tests](https://img.shields.io/badge/tests-77%20passing-brightgreen.svg)](test)
 
 *παγίδα — Greek for "trap".*
 
@@ -228,7 +228,7 @@ shipped engine rather than a reimplementation of it.
 ```bash
 npm install
 npm run dev          # rebuild on change — load dist/ as an unpacked extension
-npm test             # 72 unit tests
+npm test             # 77 unit tests
 npm run typecheck
 npm run lint
 npm run evaluate     # fetch today's feeds and re-measure

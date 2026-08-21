@@ -34,6 +34,7 @@ let currentHostname = '';
 
 function setState(text: string): void {
   el.state.hidden = false;
+  el.stateText.classList.remove('warn');
   el.stateText.textContent = text;
   el.readout.hidden = true;
   el.signalsSection.hidden = true;
@@ -64,7 +65,8 @@ function render(verdict: Verdict): void {
     el.signalsSection.hidden = false;
     el.signalCount.textContent =
       `${shown.length} signal${shown.length === 1 ? '' : 's'}` +
-      (verdict.urlOnly ? ' · address only' : '');
+      (verdict.urlOnly ? ' · ADDRESS ONLY, PAGE NOT CHECKED' : '');
+    el.signalCount.classList.toggle('warn', verdict.urlOnly);
 
     for (const s of shown) {
       const li = document.createElement('li');
@@ -137,14 +139,44 @@ async function init(): Promise<void> {
 
   if (cached?.ok && cached.verdict) return render(cached.verdict);
 
-  // No cached verdict — the worker restarted, or the content script hasn't
-  // reported yet. Fall back to an address-only check so the popup is never empty.
-  setState('Checking this address…');
+  // No verdict yet. The service worker may have been evicted, or the extension
+  // may have been reloaded while this page stayed open — in which case the
+  // content script is still alive and can simply be asked to report again.
+  //
+  // The previous version skipped this and went straight to an address-only
+  // check, which quietly produced a much weaker score with no indication that
+  // the page tier had been missed entirely. Asking the tab first is the
+  // difference between a real verdict and a plausible-looking one.
+  setState('Checking this page…');
+  const rescanned = await chrome.tabs.sendMessage(tab.id, { type: 'RESCAN' } satisfies Message)
+    .then(() => true)
+    .catch(() => false);
+
+  if (rescanned) {
+    for (let attempt = 0; attempt < 8; attempt++) {
+      await new Promise((r) => setTimeout(r, 150));
+      const retry = await chrome.runtime.sendMessage({
+        type: 'GET_VERDICT', tabId: tab.id,
+      } satisfies Message).catch(() => null);
+      if (retry?.ok && retry.verdict) return render(retry.verdict);
+    }
+  }
+
+  // The content script genuinely is not there — a page that was already open
+  // when the extension was installed, or a site that blocks injection. Score
+  // the address alone and say so plainly rather than pretending otherwise.
   const fresh = await chrome.runtime.sendMessage({
     type: 'CHECK_URL', url: currentUrl,
   } satisfies Message).catch(() => null);
 
-  if (fresh?.ok && fresh.verdict) return render(fresh.verdict);
+  if (fresh?.ok && fresh.verdict) {
+    render(fresh.verdict);
+    el.state.hidden = false;
+    el.stateText.textContent =
+      'Only the address was checked — reload the page for a full check.';
+    el.stateText.classList.add('warn');
+    return;
+  }
   setState('Could not check this page. Try reloading it.');
 }
 

@@ -18,7 +18,45 @@ import {
 import type { Message } from '../shared/messages.js';
 
 const FEED_ALARM = 'pagida-feed-refresh';
+const FEED_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const verdictCache = new Map<number, Verdict>();
+/** Guards against several tabs all kicking off a feed download at once. */
+let feedRefreshInFlight: Promise<void> | null = null;
+
+/**
+ * Download the blocklist if we have never had it, or if it is more than a day
+ * old.
+ *
+ * This used to rely purely on `chrome.alarms`, which was a mistake: alarms are
+ * clamped to a minimum delay, are not guaranteed to fire promptly after an
+ * install, and are dropped entirely if the browser is closed before they come
+ * due. The result was a fresh install sitting with an empty blocklist and no
+ * indication of why. The alarm is still there for the long-run refresh; this
+ * function is what makes the feature work on day one.
+ */
+async function ensureFeed(force = false): Promise<void> {
+  if (feedRefreshInFlight) return feedRefreshInFlight;
+
+  feedRefreshInFlight = (async () => {
+    try {
+      const settings = await getSettings();
+      if (!settings.useFeeds) return;
+
+      const current = await loadFeed();
+      const stale = Date.now() - current.updatedAt > FEED_MAX_AGE_MS;
+      if (!force && current.urls.size > 0 && !stale) return;
+
+      const snapshot = await fetchFeed();
+      if (snapshot) await saveFeed(snapshot);
+    } catch {
+      // Offline, rate-limited, or GitHub is having a day. Try again later.
+    } finally {
+      feedRefreshInFlight = null;
+    }
+  })();
+
+  return feedRefreshInFlight;
+}
 
 // ---------------------------------------------------------------- badge
 
@@ -96,15 +134,23 @@ chrome.runtime.onMessage.addListener((msg: Message, sender, sendResponse) => {
           const tabId = sender.tab?.id;
           if (!settings.enabled || tabId === undefined) return sendResponse({ ok: true });
 
+          // Cheap no-op once the feed is present and fresh.
+          void ensureFeed();
+
           const verdict = await score(msg.url, msg.dom);
           if (!verdict) return sendResponse({ ok: true });
 
+          // Count each page once, not once per re-scan. The content script
+          // re-reports when a login form appears late; that is the same page.
+          const previous = verdictCache.get(tabId);
+          const isNewPage = previous?.url !== verdict.url;
+
           verdictCache.set(tabId, verdict);
           await paintBadge(tabId, verdict);
-          await bumpStat('pagesScanned');
+          if (isNewPage) await bumpStat('pagesScanned');
 
           if (verdict.band === 'danger') {
-            await bumpStat('warnings');
+            if (isNewPage || previous?.band !== 'danger') await bumpStat('warnings');
             if (settings.showBanner && verdict.override !== 'trusted') {
               chrome.tabs.sendMessage(tabId, { type: 'SHOW_BANNER', verdict } satisfies Message)
                 .catch(() => { /* tab closed or navigated away */ });
@@ -160,6 +206,10 @@ chrome.runtime.onMessage.addListener((msg: Message, sender, sendResponse) => {
           await saveFeed(snapshot);
           return sendResponse({ ok: true, feedCount: snapshot.urls.length, updatedAt: snapshot.updatedAt });
         }
+
+        case 'RESCAN':
+          // Not for the worker — the popup sends this straight to the tab.
+          return sendResponse({ ok: false, error: 'wrong-recipient' });
 
         default:
           return sendResponse({ ok: false, error: 'unknown-message' });
@@ -227,7 +277,11 @@ chrome.runtime.onInstalled.addListener((details) => {
     if (Object.keys(seed).length > 0) await chrome.storage.local.set(seed);
 
     installMenus();
-    chrome.alarms.create(FEED_ALARM, { periodInMinutes: 60 * 12, when: Date.now() + 5_000 });
+    // `delayInMinutes` rather than a five-second `when`: Chrome clamps short
+    // alarm delays, so the old version's "refresh almost immediately" never
+    // actually happened.
+    chrome.alarms.create(FEED_ALARM, { periodInMinutes: 60 * 12, delayInMinutes: 60 * 12 });
+    void ensureFeed(true);
 
     if (details.reason === 'install') {
       void chrome.tabs.create({ url: chrome.runtime.getURL('options.html?welcome=1') });
@@ -237,17 +291,12 @@ chrome.runtime.onInstalled.addListener((details) => {
 
 chrome.runtime.onStartup.addListener(() => {
   installMenus();
-  chrome.alarms.create(FEED_ALARM, { periodInMinutes: 60 * 12, when: Date.now() + 30_000 });
+  chrome.alarms.create(FEED_ALARM, { periodInMinutes: 60 * 12, delayInMinutes: 60 * 12 });
+  void ensureFeed();
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name !== FEED_ALARM) return;
-  void (async () => {
-    const settings = await getSettings();
-    if (!settings.useFeeds) return;
-    const snapshot = await fetchFeed();
-    if (snapshot) await saveFeed(snapshot);
-  })();
+  if (alarm.name === FEED_ALARM) void ensureFeed(true);
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => verdictCache.delete(tabId));

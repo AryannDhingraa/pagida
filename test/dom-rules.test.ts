@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DomEvidence, PageEvidence } from '../src/core/types.js';
-import { evidenceFromUrl } from '../src/core/evidence.js';
+import { evidenceFromUrl, evidenceSignature } from '../src/core/evidence.js';
 import { evaluate } from '../src/core/score.js';
 
 const emptyDom: DomEvidence = {
@@ -131,5 +131,37 @@ describe('user overrides', () => {
     const v = evaluate(page('https://www.google.com/', {}, { userReported: true, domainAgeDays: 9000 }));
     expect(v.band).toBe('danger');
     expect(v.override).toBe('reported');
+  });
+});
+
+describe('re-scan fingerprint', () => {
+  it('is stable when nothing the engine scores has changed', () => {
+    const a = evidenceSignature('https://x.com/', { ...emptyDom, title: 'One' });
+    const b = evidenceSignature('https://x.com/', { ...emptyDom, title: 'Two' });
+    // The page title is not a scored signal, so it must not trigger a re-scan.
+    expect(a).toBe(b);
+  });
+
+  it('changes when a credential form appears', () => {
+    const before = evidenceSignature('https://x.com/', emptyDom);
+    const after = evidenceSignature('https://x.com/', { ...emptyDom, hasPasswordField: true });
+    expect(after).not.toBe(before);
+  });
+
+  it('changes when the form target changes', () => {
+    const a = evidenceSignature('https://x.com/', { ...emptyDom, passwordFormActions: ['https://x.com/l'] });
+    const b = evidenceSignature('https://x.com/', { ...emptyDom, passwordFormActions: ['https://evil.tk/l'] });
+    expect(a).not.toBe(b);
+  });
+
+  it('changes on navigation', () => {
+    expect(evidenceSignature('https://x.com/a', emptyDom))
+      .not.toBe(evidenceSignature('https://x.com/b', emptyDom));
+  });
+
+  it('ignores sub-pixel drift in the ratio fields', () => {
+    const a = evidenceSignature('https://x.com/', { ...emptyDom, deadLinkRatio: 0.500 });
+    const b = evidenceSignature('https://x.com/', { ...emptyDom, deadLinkRatio: 0.501 });
+    expect(a).toBe(b);
   });
 });

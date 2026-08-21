@@ -20,7 +20,9 @@ export type Message =
   | { type: 'REFRESH_FEED' }
   /** Worker -> content script: show or hide the warning bar. */
   | { type: 'SHOW_BANNER'; verdict: Verdict }
-  | { type: 'HIDE_BANNER' };
+  | { type: 'HIDE_BANNER' }
+  /** Popup -> content script: report your signals again, right now. */
+  | { type: 'RESCAN' };
 
 export type Response =
   | { ok: true; verdict: Verdict }
