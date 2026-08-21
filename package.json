@@ -1,0 +1,38 @@
+{
+  "name": "pagida",
+  "version": "1.0.0",
+  "description": "Pagida — explainable, local-first phishing detection for Chrome. Scores every page you visit against 20+ weighted signals and tells you exactly why.",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "author": "Aryan Dhingra",
+  "homepage": "https://github.com/AryanDhingraa/pagida",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AryanDhingraa/pagida.git"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/build.mjs --watch",
+    "zip": "node scripts/build.mjs && cd dist && zip -qr ../pagida-v$npm_package_version.zip . && cd .. && echo \"packaged pagida-v$npm_package_version.zip\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src scripts test --ext .ts,.mjs",
+    "evaluate": "node scripts/run-ts.mjs scripts/evaluate.ts",
+    "build:allowlist": "node scripts/run-ts.mjs scripts/build-allowlist.ts"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.287",
+    "@types/node": "^26.2.0",
+    "@typescript-eslint/eslint-plugin": "^8.18.0",
+    "@typescript-eslint/parser": "^8.18.0",
+    "esbuild": "^0.24.0",
+    "eslint": "^8.57.1",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

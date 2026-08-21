@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.zip
+.DS_Store
+.env
+.env.local
+eval-results.json
+# never commit evidence, feeds or captured pages
+evidence/
+samples/private/
