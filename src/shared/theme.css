@@ -1,0 +1,110 @@
+/* -----------------------------------------------------------------------------
+   Pagida — Console theme
+   Shared tokens for the popup, options page and link checker.
+
+   One deliberate decision: this UI is dark-only. It is a status readout that
+   appears for two seconds over whatever page you are on, and a fixed dark
+   surface reads consistently against every one of them. Every colour is
+   declared explicitly so nothing inherits from the host page.
+   -------------------------------------------------------------------------- */
+
+:root {
+  --bg: #0B0E11;
+  --panel: #12171C;
+  --panel-2: #171E24;
+  --line: #1F272F;
+  --line-soft: #171E24;
+
+  --fg: #D8E2E8;
+  --fg-2: #A2B0BA;
+  --fg-dim: #6F808C;
+
+  --clean: #4ADE80;
+  --caution: #56C7F0;
+  --suspicious: #F5B740;
+  --danger: #F87171;
+
+  --clean-dim: #163024;
+  --caution-dim: #102A36;
+  --suspicious-dim: #2E2410;
+  --danger-dim: #2E1414;
+
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  --band: var(--clean);
+  --band-dim: var(--clean-dim);
+}
+
+[data-band="caution"]    { --band: var(--caution);    --band-dim: var(--caution-dim); }
+[data-band="suspicious"] { --band: var(--suspicious); --band-dim: var(--suspicious-dim); }
+[data-band="danger"]     { --band: var(--danger);     --band-dim: var(--danger-dim); }
+
+* { box-sizing: border-box; }
+
+/* The `hidden` attribute must beat any display rule we set on a class. */
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 400 12.5px/1.55 var(--mono);
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--band); text-underline-offset: 2px; }
+
+/* --- shared primitives ---------------------------------------------------- */
+
+.brand {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 11px 14px; border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+.brand h1 {
+  margin: 0; font-size: 12px; font-weight: 700;
+  letter-spacing: .22em; color: var(--fg);
+}
+.brand .ver { font-size: 10px; color: var(--fg-dim); letter-spacing: .1em; }
+
+.icon-btn {
+  background: none; border: 0; cursor: pointer; padding: 3px 5px;
+  color: var(--fg-dim); font: inherit; font-size: 13px; border-radius: 3px;
+}
+.icon-btn:hover { color: var(--fg); background: var(--panel-2); }
+
+button, .btn {
+  font: inherit; cursor: pointer;
+  background: transparent; color: var(--fg-2);
+  border: 1px solid var(--line); border-radius: 3px;
+  padding: 7px 10px; letter-spacing: .04em;
+  transition: border-color .12s, color .12s, background .12s;
+}
+button:hover, .btn:hover { color: var(--fg); border-color: var(--fg-dim); }
+button:disabled { opacity: .45; cursor: default; }
+button.primary {
+  border-color: var(--danger); color: var(--danger);
+}
+button.primary:hover { background: var(--danger-dim); color: #FCA5A5; }
+button.ok { border-color: var(--clean); color: var(--clean); }
+button.ok:hover { background: var(--clean-dim); }
+
+:focus-visible { outline: 2px solid var(--band); outline-offset: 2px; }
+
+.dim { color: var(--fg-dim); }
+.label {
+  font-size: 9.5px; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--fg-dim);
+}
+
+hr { border: 0; border-top: 1px solid var(--line); margin: 0; }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--fg-dim); }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
