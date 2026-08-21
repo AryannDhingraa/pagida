@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en" data-band="clean">
+<head>
+  <meta charset="utf-8">
+  <title>Pagida</title>
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="brand">
+    <h1>PAGIDA</h1>
+    <button class="icon-btn" id="open-options" title="Options" aria-label="Open options">⚙</button>
+  </header>
+
+  <main id="app">
+    <section class="readout" id="readout" hidden>
+      <div class="meter-row">
+        <span class="label">RISK</span>
+        <div class="meter" role="img" aria-label="Risk meter"><div class="fill" id="meter-fill"></div></div>
+        <span class="score" id="score">--</span>
+      </div>
+      <p class="verdict" id="verdict">SCANNING</p>
+      <p class="host" id="host"></p>
+    </section>
+
+    <section class="signals" id="signals-section" hidden>
+      <p class="label sig-head"><span id="signal-count">0 signals</span></p>
+      <ul id="signals"></ul>
+    </section>
+
+    <section class="state" id="state">
+      <p class="dim" id="state-text">Checking this page…</p>
+    </section>
+  </main>
+
+  <footer class="actions" id="actions" hidden>
+    <button id="report" class="primary">report phishing</button>
+    <button id="trust" class="ok">mark safe</button>
+    <button id="undo" hidden>undo my call</button>
+  </footer>
+  <script src="popup.js"></script>
+</body>
+</html>

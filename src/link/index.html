@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en" data-band="clean">
+<head>
+  <meta charset="utf-8">
+  <title>Pagida — link check</title>
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="link.css">
+</head>
+<body>
+<div class="page">
+  <header class="brand">
+    <h1>PAGIDA</h1>
+    <span class="ver">link check</span>
+  </header>
+
+  <main>
+    <p class="label">CHECKED WITHOUT OPENING</p>
+    <p class="target" id="target">…</p>
+
+    <div class="reported" id="reported" hidden>
+      You reported this link. Pagida will warn you if you land on this site.
+    </div>
+
+    <div class="readout" id="readout" hidden>
+      <div class="meter-row">
+        <span class="label">RISK</span>
+        <div class="meter" role="img" aria-label="Risk meter"><div class="fill" id="meter-fill"></div></div>
+        <span class="score" id="score">--</span>
+      </div>
+      <p class="verdict" id="verdict"></p>
+      <p class="note" id="scope"></p>
+    </div>
+
+    <ul id="signals" class="signals"></ul>
+
+    <p class="dim" id="state">Checking…</p>
+
+    <div class="actions" id="actions" hidden>
+      <button id="report" class="primary">report as phishing</button>
+      <button id="open">open it anyway</button>
+      <button id="close">close this tab</button>
+    </div>
+  </main>
+</div>
+  <script src="link.js"></script>
+</body>
+</html>

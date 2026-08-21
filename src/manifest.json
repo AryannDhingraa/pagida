@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "Pagida — Phishing Detector",
+  "version": "1.0.0",
+  "description": "Scores every page for phishing risk and shows you exactly which warning signs it found. Runs locally. No tracking.",
+  "author": "Aryan Dhingra",
+  "homepage_url": "https://github.com/AryanDhingraa/pagida",
+  "minimum_chrome_version": "116",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Pagida — checking this page",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "options_page": "options.html",
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "permissions": ["storage", "contextMenus", "alarms"],
+  "host_permissions": [
+    "https://rdap.org/*",
+    "https://raw.githubusercontent.com/*",
+    "https://safebrowsing.googleapis.com/*"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'none'"
+  }
+}
