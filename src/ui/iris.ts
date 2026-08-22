@@ -38,6 +38,8 @@ export interface IrisOptions {
   interactive?: boolean;
   /** Draw the face at all. At 16px it is mud, so the icon drops it. */
   face?: boolean;
+  /** Let her wander slowly around her slot instead of holding still. */
+  drift?: boolean;
   /** Document to attach pointer listeners to (a shadow root's host document). */
   listenOn?: Document;
 }
@@ -95,6 +97,20 @@ export const IRIS_CSS = `
 .iris.ir-interactive { cursor: pointer; touch-action: none; }
 .iris.ir-float { animation: ir-bob 4.6s ease-in-out infinite; }
 @keyframes ir-bob { 0%,100% { translate: 0 0 } 50% { translate: 0 -7% } }
+
+/* A slow wander, for when she is sitting on a page rather than in a fixed slot.
+   Deliberately small and deliberately slow — a mascot that skitters around the
+   screen is a mascot people switch off. Roughly a fifteen-second circuit. */
+.iris.ir-drift { animation: ir-wander 15s ease-in-out infinite; }
+@keyframes ir-wander {
+  0%   { translate: 0 0 }
+  20%  { translate: 5% -6% }
+  40%  { translate: 8% 3% }
+  60%  { translate: -2% 7% }
+  80%  { translate: -6% -2% }
+  100% { translate: 0 0 }
+}
+.iris.ir-float.ir-drift { animation: ir-bob 4.6s ease-in-out infinite, ir-wander 15s ease-in-out infinite; }
 
 .iris .ir-g { position: absolute; border-radius: 50%; pointer-events: none;
   filter: blur(calc(var(--ir-size,120px) * .085));
@@ -194,7 +210,7 @@ export const IRIS_CSS = `
 .iris.ir-interactive:hover .ir-eye { r: 7.6 }
 
 @media (prefers-reduced-motion: reduce) {
-  .iris, .iris .ir-g2, .iris .ir-g3, .iris .ir-tear { animation: none !important }
+  .iris, .iris.ir-drift, .iris .ir-g2, .iris .ir-g3, .iris .ir-tear { animation: none !important }
   .iris * { transition-duration: 1ms !important }
 }
 `;
@@ -208,7 +224,7 @@ export function injectIrisCss(root: Document | ShadowRoot): void {
     cssInjected = true;
   }
   const style = document.createElement('style');
-  style.textContent = IRIS_CSS;
+  style.textContent = IRIS_CSS + IRIS_TAG_ALONG_CSS;
   (root instanceof Document ? root.head : root).appendChild(style);
 }
 
@@ -231,7 +247,7 @@ export class Iris {
   private listenOn: Document;
 
   constructor(host: HTMLElement, opts: IrisOptions = {}) {
-    const { size = 120, interactive = true, face = true, listenOn = document } = opts;
+    const { size = 120, interactive = true, face = true, drift = false, listenOn = document } = opts;
     this.listenOn = listenOn;
 
     this.el = host;
@@ -244,6 +260,8 @@ export class Iris {
 
     this.setBand('clean');
     this.setExpression('calm');
+
+    if (drift) this.el.classList.add('ir-drift');
 
     if (interactive && face) {
       this.el.classList.add('ir-interactive', 'ir-float');
@@ -347,4 +365,60 @@ export class Iris {
 
 function clamp(n: number): number {
   return Math.max(-1, Math.min(1, n));
+}
+
+// ---------------------------------------------------------------------------
+// The scroll companion.
+//
+// On a long page the header Iris scrolls away and the page loses its face. This
+// keeps her present: once the main one leaves the viewport, a smaller Iris fades
+// in near the corner and drifts there until you scroll back up. She is never in
+// two places at once, and she never covers the content.
+// ---------------------------------------------------------------------------
+
+export const IRIS_TAG_ALONG_CSS = `
+.ir-tagalong {
+  position: fixed; right: 26px; bottom: 26px; z-index: 40;
+  opacity: 0; transform: translateY(14px) scale(.9); pointer-events: none;
+  transition: opacity 420ms cubic-bezier(.22,1,.36,1), transform 420ms cubic-bezier(.22,1,.36,1);
+}
+.ir-tagalong.show { opacity: 1; transform: none; pointer-events: auto; }
+@media (max-width: 640px) { .ir-tagalong { right: 14px; bottom: 14px; } }
+`;
+
+export interface TagAlong {
+  iris: Iris;
+  setBand: (band: Band) => void;
+  setExpression: (e: Expression) => void;
+  destroy: () => void;
+}
+
+/**
+ * @param anchor the element whose leaving the viewport brings her out
+ */
+export function attachScrollCompanion(anchor: Element, size = 56): TagAlong {
+  const host = document.createElement('div');
+  host.className = 'ir-tagalong';
+  document.body.appendChild(host);
+
+  const inner = document.createElement('div');
+  host.appendChild(inner);
+  const iris = new Iris(inner, { size, interactive: true, drift: true });
+
+  const observer = new IntersectionObserver(
+    ([entry]) => host.classList.toggle('show', !entry?.isIntersecting),
+    { threshold: 0.15 },
+  );
+  observer.observe(anchor);
+
+  return {
+    iris,
+    setBand: (band) => iris.setBand(band),
+    setExpression: (e) => iris.setExpression(e),
+    destroy: () => {
+      observer.disconnect();
+      iris.destroy();
+      host.remove();
+    },
+  };
 }

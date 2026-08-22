@@ -11,7 +11,7 @@
  * re-reports only when something the engine would actually score has changed,
  * and never more than a handful of times per page.
  */
-import { extractDomEvidence } from './extract.js';
+import { extractDomEvidence, extractTechFacts } from './extract.js';
 import { hideCompanion, showCompanion } from './companion.js';
 import { evidenceSignature } from '../core/evidence.js';
 import type { Message } from '../shared/messages.js';
@@ -37,7 +37,7 @@ function report(force = false): void {
     lastSignature = signature;
     reportCount++;
     void chrome.runtime.sendMessage({
-      type: 'PAGE_SIGNALS', url: location.href, dom,
+      type: 'PAGE_SIGNALS', url: location.href, dom, tech: extractTechFacts(),
     } satisfies Message);
   } catch {
     // The worker may be asleep or the extension reloading. Nothing to do.

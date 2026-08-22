@@ -4,11 +4,11 @@
  * silently at runtime, which is the usual failure mode in extensions.
  */
 import type { DomEvidence, Verdict } from '../core/types.js';
-import type { SiteReport } from '../services/report.js';
+import type { SiteReport, TechFacts } from '../services/report.js';
 
 export type Message =
   /** Content script -> worker: here is what the page looks like. */
-  | { type: 'PAGE_SIGNALS'; url: string; dom: DomEvidence }
+  | { type: 'PAGE_SIGNALS'; url: string; dom: DomEvidence; tech?: TechFacts }
   /** Popup -> worker: what did you decide about the tab I'm on? */
   | { type: 'GET_VERDICT'; tabId?: number }
   /** Popup/link page -> worker: score this URL without visiting it. */
@@ -21,6 +21,9 @@ export type Message =
   | { type: 'REFRESH_FEED' }
   /** Report page -> worker: gather everything you can about this site. */
   | { type: 'BUILD_REPORT'; url: string }
+  /** Popup -> worker: which URL is this tab on? Needed when the popup cannot
+   *  read tab.url itself, which is the common case without host permission. */
+  | { type: 'GET_TAB_URL'; tabId: number }
   /** Content script -> worker: open the full report for this page. */
   | { type: 'OPEN_REPORT'; url: string }
   /** Worker -> content script: bring Iris onto the page, or take her away. */
@@ -31,6 +34,7 @@ export type Message =
 
 export type Response =
   | { ok: true; verdict: Verdict }
+  | { ok: true; url: string }
   | { ok: true; report: SiteReport }
   | { ok: true; feedCount: number; updatedAt: number }
   | { ok: true }

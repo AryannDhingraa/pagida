@@ -17,7 +17,7 @@ exactly which rule misfired.
 ## Setting up
 
 ```bash
-git clone https://github.com/AryanDhingraa/pagida.git
+git clone https://github.com/AryannDhingraa/pagida.git
 cd pagida
 npm install
 npm run dev

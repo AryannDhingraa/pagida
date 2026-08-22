@@ -7,12 +7,13 @@
  */
 import type { DomEvidence, Verdict } from '../core/types.js';
 import { evidenceFromUrl, isAnalysable } from '../core/evidence.js';
-import { evaluate, summarise } from '../core/score.js';
+import { BAND_NAME, evaluate, summarise } from '../core/score.js';
 import { parseHost } from '../core/util/domain.js';
 import { domainAgeDays } from '../services/rdap.js';
 import { fetchFeed, loadFeed, normaliseUrl, saveFeed } from '../services/feeds.js';
 import { safeBrowsingLookup } from '../services/safebrowsing.js';
-import { buildReport } from '../services/report.js';
+import { buildReport, type TechFacts } from '../services/report.js';
+import { animateIcon, setIconBand } from './icon.js';
 import {
   bumpStat, clearMark, getMarks, getSettings, setMark, STORAGE_DEFAULTS,
 } from '../shared/settings.js';
@@ -21,6 +22,11 @@ import type { Message } from '../shared/messages.js';
 const FEED_ALARM = 'pagida-feed-refresh';
 const FEED_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const verdictCache = new Map<number, Verdict>();
+/** What the content script noticed about how each tab's page is built. */
+const techCache = new Map<number, TechFacts>();
+/** The URL each tab is on, so the popup can ask us instead of needing its own
+ *  host permission for every site the user visits. */
+const urlCache = new Map<number, string>();
 /** Guards against several tabs all kicking off a feed download at once. */
 let feedRefreshInFlight: Promise<void> | null = null;
 
@@ -72,13 +78,19 @@ const BADGE_TEXT: Record<Verdict['band'], string> = {
   clean: '', caution: '!', suspicious: '!!', danger: '!!!',
 };
 
-async function paintBadge(tabId: number, verdict: Verdict): Promise<void> {
+async function paintBadge(tabId: number, verdict: Verdict, animate = false): Promise<void> {
   await chrome.action.setBadgeBackgroundColor({ tabId, color: BADGE_COLOUR[verdict.band] });
   await chrome.action.setBadgeText({ tabId, text: BADGE_TEXT[verdict.band] });
   await chrome.action.setTitle({
     tabId,
-    title: `Pagida — ${verdict.score}/100. ${summarise(verdict)}`,
+    title: `Pagida — ${BAND_NAME[verdict.band]}, ${verdict.score}/100. ${summarise(verdict)}`,
   });
+
+  // The icon is drawn rather than loaded, so it can react. A short bounce and
+  // blink when a page finishes being scored; a pulse on top of that when the
+  // news is bad. Never a permanent loop.
+  if (animate) void animateIcon(tabId, verdict.band);
+  else void setIconBand(tabId, verdict.band);
 }
 
 // ---------------------------------------------------------------- scoring
@@ -141,13 +153,16 @@ chrome.runtime.onMessage.addListener((msg: Message, sender, sendResponse) => {
           const verdict = await score(msg.url, msg.dom);
           if (!verdict) return sendResponse({ ok: true });
 
+          if (msg.tech) techCache.set(tabId, msg.tech);
+          urlCache.set(tabId, msg.url);
+
           // Count each page once, not once per re-scan. The content script
           // re-reports when a login form appears late; that is the same page.
           const previous = verdictCache.get(tabId);
           const isNewPage = previous?.url !== verdict.url;
 
           verdictCache.set(tabId, verdict);
-          await paintBadge(tabId, verdict);
+          await paintBadge(tabId, verdict, isNewPage);
           if (isNewPage) await bumpStat('pagesScanned');
 
           // Iris steps onto the page from "suspicious" upward, not only at the
@@ -216,9 +231,28 @@ chrome.runtime.onMessage.addListener((msg: Message, sender, sendResponse) => {
           // The verdict comes first so the report can lead with it, and so a
           // slow lookup never delays the part the user actually asked about.
           const verdict = await score(msg.url);
-          const report = await buildReport(msg.url, verdict ?? undefined);
+          let tech: TechFacts | undefined;
+          for (const [id, url] of urlCache) {
+            if (url === msg.url) { tech = techCache.get(id); break; }
+          }
+          const report = await buildReport(msg.url, verdict ?? undefined, tech);
           if (!report) return sendResponse({ ok: false, error: 'not-analysable' });
           return sendResponse({ ok: true, report });
+        }
+
+        case 'GET_TAB_URL': {
+          const known = urlCache.get(msg.tabId);
+          if (known) return sendResponse({ ok: true, url: known });
+          // Fall back to asking Chrome. With activeTab this succeeds while the
+          // popup is open; without it, it will not, and that is not an error.
+          try {
+            const tab = await chrome.tabs.get(msg.tabId);
+            if (tab.url) {
+              urlCache.set(msg.tabId, tab.url);
+              return sendResponse({ ok: true, url: tab.url });
+            }
+          } catch { /* no permission for this tab */ }
+          return sendResponse({ ok: false, error: 'unknown-url' });
         }
 
         case 'OPEN_REPORT': {
@@ -320,10 +354,17 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === FEED_ALARM) void ensureFeed(true);
 });
 
-chrome.tabs.onRemoved.addListener((tabId) => verdictCache.delete(tabId));
+chrome.tabs.onRemoved.addListener((tabId) => {
+  verdictCache.delete(tabId);
+  techCache.delete(tabId);
+  urlCache.delete(tabId);
+});
 chrome.tabs.onUpdated.addListener((tabId, info) => {
   if (info.status === 'loading') {
     verdictCache.delete(tabId);
+    techCache.delete(tabId);
     void chrome.action.setBadgeText({ tabId, text: '' });
+    void setIconBand(tabId, 'clean');
   }
+  if (info.url) urlCache.set(tabId, info.url);
 });

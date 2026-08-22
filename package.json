@@ -1,15 +1,15 @@
 {
   "name": "pagida",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Pagida \u2014 explainable, local-first phishing detection for Chrome. Scores every page you visit against 20+ weighted signals and tells you exactly why.",
   "type": "module",
   "private": true,
   "license": "MIT",
   "author": "Aryan Dhingra",
-  "homepage": "https://github.com/AryanDhingraa/pagida",
+  "homepage": "https://github.com/AryannDhingraa/pagida",
   "repository": {
     "type": "git",
-    "url": "https://github.com/AryanDhingraa/pagida.git"
+    "url": "https://github.com/AryannDhingraa/pagida.git"
   },
   "engines": {
     "node": ">=20"

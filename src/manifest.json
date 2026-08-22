@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Iris checks every page for scams and shows you exactly what she found, in plain English. Runs locally. No tracking.",
   "author": "Aryan Dhingra",
-  "homepage_url": "https://github.com/AryanDhingraa/pagida",
+  "homepage_url": "https://github.com/AryannDhingraa/pagida",
   "minimum_chrome_version": "116",
   "icons": {
     "16": "icons/icon16.png",
@@ -43,15 +43,12 @@
   "permissions": [
     "storage",
     "contextMenus",
-    "alarms"
+    "alarms",
+    "activeTab"
   ],
   "host_permissions": [
-    "https://rdap.org/*",
-    "https://raw.githubusercontent.com/*",
-    "https://safebrowsing.googleapis.com/*",
-    "https://cloudflare-dns.com/*",
-    "https://internetdb.shodan.io/*",
-    "https://crt.sh/*"
+    "http://*/*",
+    "https://*/*"
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'none'"

@@ -10,7 +10,7 @@ release.
 
 Please report security issues **privately** rather than opening a public issue.
 
-- Preferred: [GitHub private vulnerability reporting](https://github.com/AryanDhingraa/pagida/security/advisories/new)
+- Preferred: [GitHub private vulnerability reporting](https://github.com/AryannDhingraa/pagida/security/advisories/new)
 - Alternative: open an issue titled "security contact request" containing no
   details, and I will reply with a private channel.
 

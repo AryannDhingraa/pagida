@@ -12,7 +12,7 @@
  *  3. If the page tier could not run, it says so out loud instead of quietly
  *     showing a weaker score as though it were the whole answer.
  */
-import type { Verdict } from '../core/types.js';
+import type { Signal, Verdict } from '../core/types.js';
 import { adviceFor, BAND_NAME, headlineFor } from '../core/score.js';
 import { Iris, expressionForBand, injectIrisCss } from '../ui/iris.js';
 import type { Message } from '../shared/messages.js';
@@ -40,7 +40,7 @@ const el = {
 };
 
 injectIrisCss(document);
-const iris = new Iris($('iris'), { size: 68, interactive: true });
+const iris = new Iris($('iris'), { size: 68, interactive: true, drift: true });
 iris.setExpression('thinking');
 
 let currentUrl = '';
@@ -142,6 +142,61 @@ function setThinking(text: string): void {
   iris.setExpression('thinking');
 }
 
+// ---------------------------------------------------------------- quick facts
+
+/**
+ * The site's vital signs, fetched in the background while the user reads the
+ * verdict. The popup used to show nothing but a score and a list, which was the
+ * main complaint about it: you had to leave to learn anything about the site.
+ */
+function setFact(id: string, value: string, tone: '' | 'good' | 'warn' | 'bad' | 'unknown' = ''): void {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = value;
+  el.className = `v ${tone}`;
+  el.parentElement?.classList.remove('loading');
+}
+
+function describeAge(days: number): string {
+  if (days < 1) return 'Made today';
+  if (days < 45) return `${days} day${days === 1 ? '' : 's'} old`;
+  if (days < 730) return `${Math.round(days / 30.4)} months old`;
+  return `${Math.floor(days / 365)} years old`;
+}
+
+async function loadQuickFacts(url: string): Promise<void> {
+  $('facts').hidden = false;
+  const res = await chrome.runtime.sendMessage({ type: 'BUILD_REPORT', url } satisfies Message)
+    .catch(() => null);
+
+  if (!res?.ok || !res.report) {
+    for (const id of ['f-age', 'f-where', 'f-tls', 'f-lists']) setFact(id, 'Unknown', 'unknown');
+    return;
+  }
+  const r = res.report;
+
+  // How old — registration first, then the earliest certificate, then the archive.
+  const age = r.registration?.ageDays ?? r.certs?.ageDays ?? r.archive?.ageDays;
+  if (age === undefined || age === null) setFact('f-age', 'Unknown', 'unknown');
+  else setFact('f-age', describeAge(age), age < 30 ? 'bad' : age < 180 ? 'warn' : 'good');
+
+  // Where it is hosted, in words rather than an address.
+  const where = r.ip?.country
+    ? `${r.ip.country}${r.ip.asnName ? ` · ${r.ip.asnName.split(' ').slice(0, 3).join(' ')}` : ''}`
+    : undefined;
+  setFact('f-where', where ?? 'Unknown', where ? '' : 'unknown');
+
+  setFact('f-tls',
+    r.protocol === 'https:' ? 'Encrypted' : 'Not encrypted',
+    r.protocol === 'https:' ? 'good' : 'bad');
+
+  const onList = r.verdict?.signals.some((sig: Signal) => sig.id.startsWith('phishing_feed')) ?? false;
+  const malware = r.malware?.listed ?? false;
+  if (onList || malware) setFact('f-lists', malware ? 'On a malware list' : 'On a scam list', 'bad');
+  else if (r.malware) setFact('f-lists', 'Not listed', 'good');
+  else setFact('f-lists', 'Unknown', 'unknown');
+}
+
 // ---------------------------------------------------------------- actions
 
 async function mark(verdict: 'phishing' | 'safe'): Promise<void> {
@@ -201,17 +256,37 @@ $('options-link').addEventListener('click', () => void chrome.runtime.openOption
 
 async function init(): Promise<void> {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.url || tab.id === undefined) {
+  if (!tab || tab.id === undefined) {
     iris.setExpression('sleepy');
     el.headline.textContent = 'Nothing to check here.';
     el.advice.textContent = 'Open a website and I will take a look.';
     return;
   }
 
-  currentUrl = tab.url;
-  try { currentHostname = new URL(currentUrl).hostname; } catch { currentHostname = ''; }
+  // `tab.url` is only readable with host permission for that page. The popup
+  // has activeTab, which grants it — but a worker restart or a race can still
+  // leave it empty, so the service worker (which learned the URL from the
+  // content script) is the fallback. Getting this wrong is what made the popup
+  // claim there was nothing to check on a perfectly ordinary website.
+  let url = tab.url ?? '';
+  if (!url) {
+    const answer = await chrome.runtime.sendMessage({
+      type: 'GET_TAB_URL', tabId: tab.id,
+    } satisfies Message).catch(() => null);
+    if (answer?.ok && answer.url) url = answer.url;
+  }
 
-  if (!/^https?:/.test(currentUrl)) {
+  if (!url) {
+    iris.setExpression('sad');
+    el.headline.textContent = 'I cannot see this tab.';
+    el.advice.textContent = 'Reload the page and open me again — I should be able to read it then.';
+    return;
+  }
+
+  currentUrl = url;
+  try { currentHostname = new URL(url).hostname; } catch { currentHostname = ''; }
+
+  if (!/^https?:/.test(url)) {
     iris.setExpression('sleepy');
     el.headline.textContent = 'This is a browser screen.';
     el.advice.textContent = 'I only check normal websites, so there is nothing for me to do here.';
@@ -219,20 +294,20 @@ async function init(): Promise<void> {
   }
 
   setThinking('Checking this page…');
+  // The facts run alongside the verdict rather than after it, so the popup
+  // fills in from both ends instead of sitting empty.
+  void loadQuickFacts(url);
 
   const cached = await chrome.runtime.sendMessage({
     type: 'GET_VERDICT', tabId: tab.id,
   } satisfies Message).catch(() => null);
   if (cached?.ok && cached.verdict) return render(cached.verdict);
 
-  // No verdict yet — the worker may have been evicted, or the extension
-  // reloaded while this page stayed open. Ask the tab to report again before
-  // falling back to a weaker address-only check.
   const rescanned = await chrome.tabs.sendMessage(tab.id, { type: 'RESCAN' } satisfies Message)
     .then(() => true).catch(() => false);
 
   if (rescanned) {
-    for (let attempt = 0; attempt < 8; attempt++) {
+    for (let attempt = 0; attempt < 10; attempt++) {
       await new Promise((r) => setTimeout(r, 150));
       const retry = await chrome.runtime.sendMessage({
         type: 'GET_VERDICT', tabId: tab.id,
@@ -242,7 +317,7 @@ async function init(): Promise<void> {
   }
 
   const fresh = await chrome.runtime.sendMessage({
-    type: 'CHECK_URL', url: currentUrl,
+    type: 'CHECK_URL', url,
   } satisfies Message).catch(() => null);
 
   if (fresh?.ok && fresh.verdict) return render(fresh.verdict);

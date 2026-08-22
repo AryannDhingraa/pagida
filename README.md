@@ -10,7 +10,7 @@ Iris checks every page you open and tells you, in a sentence, whether to trust
 it — then shows you every single reason behind that answer. No machine-learning
 black box, no account, no server, nothing sent anywhere by default.
 
-[![CI](https://github.com/AryanDhingraa/pagida/actions/workflows/ci.yml/badge.svg)](https://github.com/AryanDhingraa/pagida/actions/workflows/ci.yml)
+[![CI](https://github.com/AryannDhingraa/pagida/actions/workflows/ci.yml/badge.svg)](https://github.com/AryannDhingraa/pagida/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Manifest V3](https://img.shields.io/badge/manifest-v3-blue.svg)](src/manifest.json)
 [![Tests](https://img.shields.io/badge/tests-79%20passing-brightgreen.svg)](test)
@@ -70,7 +70,7 @@ someone judge a site for themselves.
 **From source:**
 
 ```bash
-git clone https://github.com/AryanDhingraa/pagida.git
+git clone https://github.com/AryannDhingraa/pagida.git
 cd pagida
 npm install
 npm run build

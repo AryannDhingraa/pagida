@@ -119,5 +119,5 @@ history and noted in the release notes for the version they ship in.
 
 ## Contact
 
-Open an issue at <https://github.com/AryanDhingraa/pagida/issues>, or see
+Open an issue at <https://github.com/AryannDhingraa/pagida/issues>, or see
 [SECURITY.md](SECURITY.md) for security-specific reports.

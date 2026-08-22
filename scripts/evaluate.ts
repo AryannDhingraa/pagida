@@ -56,7 +56,7 @@ const HARD_NEGATIVES = [
   'https://auspost.com.au/mypost/track/#/details/ABC123456789',
   'https://www.amazon.com.au/ap/signin?openid.return_to=https%3A%2F%2Fwww.amazon.com.au',
   'https://www.netflix.com/login?nextpage=https%3A%2F%2Fwww.netflix.com%2Fbrowse',
-  'https://github.com/login?return_to=%2FAryanDhingraa%2Fpagida',
+  'https://github.com/login?return_to=%2FAryannDhingraa%2Fpagida',
   'https://www.linkedin.com/checkpoint/lg/login-submit',
   'https://www.facebook.com/login/device-based/regular/login/',
   'https://secure.telstra.com.au/customer-login',

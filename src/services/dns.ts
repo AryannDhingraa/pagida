@@ -40,6 +40,8 @@ export interface DnsFacts {
   hasMx?: boolean;
   mxHosts?: string[];
   nameservers?: string[];
+  /** The host is an alias for something else — often a CDN or a site builder. */
+  cname?: string[];
   /** Published sender policy — absent is a mild negative for a real business. */
   hasSpf?: boolean;
   spf?: string;
@@ -53,21 +55,39 @@ function unquote(s: string): string {
   return s.replace(/^"|"$/g, '').replace(/" "/g, '');
 }
 
-export async function lookupDns(domain: string): Promise<DnsFacts> {
+/**
+ * @param hostname the exact host the user is on, e.g. `www.example.com`
+ * @param domain   the registrable domain, e.g. `example.com`
+ *
+ * Addresses are looked up on the hostname, because plenty of sites publish an A
+ * record only on `www` — an earlier version queried the registrable domain and
+ * came back with nothing for all of them. Mail and policy records are looked up
+ * on the registrable domain, which is where they are published.
+ */
+export async function lookupDns(hostname: string, domain: string): Promise<DnsFacts> {
   const facts: DnsFacts = {};
 
   // Fired together — the report is already the slowest thing Pagida does.
-  const [a, aaaa, mx, ns, txt, dmarcTxt] = await Promise.all([
-    query(domain, 'A'),
-    query(domain, 'AAAA'),
+  const [a, aaaa, mx, ns, txt, dmarcTxt, cname] = await Promise.all([
+    query(hostname, 'A'),
+    query(hostname, 'AAAA'),
     query(domain, 'MX'),
     query(domain, 'NS'),
     query(domain, 'TXT'),
     query(`_dmarc.${domain}`, 'TXT'),
+    query(hostname, 'CNAME'),
   ]);
 
   if (a) facts.ipv4 = a.filter((r) => r.type === 1).map((r) => r.data);
   if (aaaa) facts.ipv6 = aaaa.filter((r) => r.type === 28).map((r) => r.data);
+  if (cname) facts.cname = cname.filter((r) => r.type === 5).map((r) => r.data.replace(/\.$/, ''));
+
+  // Fall back to the registrable domain so the host section still has an
+  // address to work with when the exact hostname has none.
+  if (hostname !== domain && (!facts.ipv4 || facts.ipv4.length === 0)) {
+    const fallback = await query(domain, 'A');
+    if (fallback) facts.ipv4 = fallback.filter((r) => r.type === 1).map((r) => r.data);
+  }
 
   if (mx) {
     facts.mxHosts = mx

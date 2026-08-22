@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
+  <div class="sky"></div>
   <main id="app">
     <section class="top">
       <div class="face" id="iris"></div>
@@ -24,6 +25,13 @@
         <span class="label" id="band-name">Nothing found</span>
         <span class="num" id="score">0</span>
       </div>
+    </section>
+
+    <section class="facts" id="facts" hidden>
+      <div class="f loading"><span class="k">Site age</span><span class="v" id="f-age">checking…</span></div>
+      <div class="f loading"><span class="k">Hosted in</span><span class="v" id="f-where">checking…</span></div>
+      <div class="f loading"><span class="k">Connection</span><span class="v" id="f-tls">checking…</span></div>
+      <div class="f loading"><span class="k">Known scam list</span><span class="v" id="f-lists">checking…</span></div>
     </section>
 
     <section class="found" id="found" hidden>

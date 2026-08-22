@@ -78,8 +78,8 @@ Every line is on GitHub under the MIT licence, including a published evaluation
 of how well the detection actually performs — measured against live phishing
 feeds, with the false-positive rate stated openly.
 
-Source: https://github.com/AryanDhingraa/pagida
-Privacy policy: https://github.com/AryanDhingraa/pagida/blob/main/PRIVACY.md
+Source: https://github.com/AryannDhingraa/pagida
+Privacy policy: https://github.com/AryannDhingraa/pagida/blob/main/PRIVACY.md
 
 **WHAT IT WILL NOT DO**
 

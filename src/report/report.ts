@@ -11,7 +11,7 @@
 import { adviceFor, BAND_NAME, headlineFor } from '../core/score.js';
 import { ALARMING_PORTS } from '../services/netinfo.js';
 import type { SiteReport } from '../services/report.js';
-import { Iris, expressionForBand, injectIrisCss } from '../ui/iris.js';
+import { attachScrollCompanion, Iris, expressionForBand, injectIrisCss, type TagAlong } from '../ui/iris.js';
 import type { Message } from '../shared/messages.js';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -21,8 +21,19 @@ const params = new URLSearchParams(location.search);
 const target = params.get('u') ?? '';
 
 injectIrisCss(document);
-const iris = new Iris($('iris'), { size: 92, interactive: true });
+const iris = new Iris($('iris'), { size: 92, interactive: true, drift: true });
 iris.setExpression('thinking');
+
+// She follows you down the page instead of scrolling out of existence.
+let tagAlong: TagAlong | undefined;
+window.addEventListener('DOMContentLoaded', () => {
+  tagAlong = attachScrollCompanion(document.querySelector('.hero')!, 54);
+  tagAlong.setExpression('thinking');
+}, { once: true });
+if (document.readyState !== 'loading') {
+  tagAlong = attachScrollCompanion(document.querySelector('.hero')!, 54);
+  tagAlong.setExpression('thinking');
+}
 
 let report: SiteReport | undefined;
 
@@ -184,6 +195,33 @@ function renderSite(r: SiteReport): void {
     ],
   ));
 
+  const arch = r.archive;
+  p.appendChild(group(
+    'Has anyone been here before?',
+    'The Internet Archive has been photographing the web since 1996. An attacker can buy an old domain, but they cannot go back and put it in the archive.',
+    [
+      fact('In the Internet Archive', arch === undefined ? undefined : arch.archived ? 'Yes' : 'Never captured',
+        arch === undefined ? 'unknown' : arch.archived ? 'good' : 'warn'),
+      fact('First captured', arch?.firstCapture, 'plain',
+        arch?.ageDays === undefined ? undefined : `${humanAge(arch.ageDays)} ago`),
+    ],
+  ));
+
+  const mal = r.malware;
+  p.appendChild(group(
+    'On any public blocklist?',
+    'Two independent lists, both public. One tracks credential theft, the other tracks sites handing out malware.',
+    [
+      fact('Known scam list', r.verdict?.signals.some((sg) => sg.id.startsWith('phishing_feed'))
+        ? 'Listed' : r.verdict ? 'Not listed' : undefined,
+        r.verdict?.signals.some((sg) => sg.id.startsWith('phishing_feed')) ? 'bad' : 'good'),
+      fact('Malware list', mal === undefined ? undefined : mal.listed ? 'Listed' : 'Not listed',
+        mal === undefined ? 'unknown' : mal.listed ? 'bad' : 'good'),
+      fact('Malware seen', mal?.tags?.length ? mal.tags.join(', ') : undefined),
+      fact('First reported', mal?.firstSeen),
+    ],
+  ));
+
   p.appendChild(group(
     'Is it known?',
     'Pagida ships a list of the two thousand most visited domains in the world. Being on it does not make a site safe, but it does mean it is not a name someone invented last week.',
@@ -232,12 +270,81 @@ function renderHost(r: SiteReport): void {
     portRows,
   ));
 
+  const ip = r.ip;
+  p.appendChild(group(
+    'Who owns that machine',
+    'An address on its own means nothing to most people. This is the company that operates it and the country it sits in — a bank in your own country hosted on a reseller in another one is worth a second look.',
+    [
+      fact('Network operator', ip?.asnName, ip?.isHosting ? 'warn' : 'plain'),
+      fact('Network number', ip?.asn),
+      fact('Internet provider', ip?.isp),
+      fact('Country', ip?.country),
+      fact('City', [ip?.city, ip?.region].filter(Boolean).join(', ') || undefined),
+      fact('Datacentre hosting', ip?.isHosting === undefined ? undefined : ip.isHosting ? 'Yes' : 'No',
+        'plain', ip?.isHosting ? 'Normal for a real business, and also where throwaway sites live' : undefined),
+    ],
+  ));
+
   p.appendChild(group(
     'Who answers for the name',
     'The nameservers are whoever the owner pays to point the name at a machine.',
     [
       fact('Nameservers', dns?.nameservers?.length ? dns.nameservers.join(', ')
         : r.registration?.nameservers?.length ? r.registration.nameservers.join(', ') : undefined),
+      fact('Alias for', dns?.cname?.length ? dns.cname.join(', ') : undefined, 'plain',
+        dns?.cname?.length ? 'This name points at another one — usually a CDN or a site builder' : undefined),
+    ],
+  ));
+}
+
+/** What the page is made of. Costs no network call and no privacy. */
+function renderTech(r: SiteReport): void {
+  const p = panel('tech');
+  p.replaceChildren();
+  const t = r.tech;
+
+  if (!t) {
+    const msg = document.createElement('p');
+    msg.className = 'why';
+    msg.textContent =
+      'I have not read this page itself — open the report from the Pagida popup while you are on the site and this fills in.';
+    p.appendChild(msg);
+    return;
+  }
+
+  p.appendChild(group(
+    'What this page says it is',
+    'Straight from the page. Worth comparing against what the address claims.',
+    [
+      fact('Title', t.title),
+      fact('Description', t.description),
+      fact('Built with', t.generator),
+      fact('Technology', t.frameworks?.length ? t.frameworks.join(', ') : undefined),
+    ],
+  ));
+
+  const third = t.externalScriptHosts ?? [];
+  p.appendChild(group(
+    'Whose code runs here',
+    'Every site on this list can change what this page does. A login page pulling code from a dozen strangers is a login page worth being careful on.',
+    [
+      fact('Outside code sources', third.length ? String(third.length) : t.resourceCounts ? 'None' : undefined,
+        third.length > 8 ? 'warn' : third.length ? 'plain' : 'good'),
+      fact('They are', third.length ? third.join(', ') : undefined),
+      fact('Scripts on the page', t.resourceCounts ? String(t.resourceCounts.scripts) : undefined),
+      fact('Frames', t.resourceCounts ? String(t.resourceCounts.iframes) : undefined,
+        (t.resourceCounts?.iframes ?? 0) > 3 ? 'warn' : 'plain'),
+    ],
+  ));
+
+  p.appendChild(group(
+    'What it is asking for',
+    'Forms are how a page takes something from you.',
+    [
+      fact('Forms', t.formCount === undefined ? undefined : String(t.formCount)),
+      fact('Asks for a password', t.hasPasswordField === undefined ? undefined
+        : t.hasPasswordField ? 'Yes' : 'No', t.hasPasswordField ? 'warn' : 'plain'),
+      fact('Links off this site', t.externalLinkHosts?.length ? t.externalLinkHosts.slice(0, 8).join(', ') : undefined),
     ],
   ));
 }
@@ -294,6 +401,8 @@ function renderHeader(r: SiteReport): void {
     document.documentElement.setAttribute('data-band', v.band);
     iris.setBand(v.band);
     iris.setExpression(expressionForBand(v.band));
+    tagAlong?.setBand(v.band);
+    tagAlong?.setExpression(expressionForBand(v.band));
     $('verdict').textContent = headlineFor(v);
     $('score-ring').hidden = false;
     $('score').textContent = String(v.score);
@@ -305,7 +414,7 @@ function renderHeader(r: SiteReport): void {
 
   const missing = r.unavailable;
   $('sources').textContent =
-    'Sources: rdap.org · cloudflare-dns.com · internetdb.shodan.io · crt.sh' +
+    'Sources: rdap.org · cloudflare-dns.com · internetdb.shodan.io · crt.sh · ipwho.is · archive.org · urlhaus.abuse.ch' +
     (missing.length ? ` — no answer from: ${missing.join(', ')}` : '');
 }
 
@@ -334,7 +443,7 @@ async function load(): Promise<void> {
 
   try { $('domain').textContent = new URL(target).hostname; } catch { /* keep the placeholder */ }
   $('full-url').textContent = target;
-  for (const name of ['risk', 'site', 'host', 'mail']) {
+  for (const name of ['risk', 'site', 'host', 'mail', 'tech']) {
     panel(name).replaceChildren(pending('Looking this up…'));
   }
 
@@ -344,7 +453,7 @@ async function load(): Promise<void> {
   if (!res?.ok || !res.report) {
     iris.setExpression('sad');
     $('verdict').textContent = 'I could not gather anything about this site.';
-    for (const name of ['risk', 'site', 'host', 'mail']) {
+    for (const name of ['risk', 'site', 'host', 'mail', 'tech']) {
       const p = panel(name);
       p.replaceChildren();
       const msg = document.createElement('p');
@@ -361,6 +470,7 @@ async function load(): Promise<void> {
   renderSite(report);
   renderHost(report);
   renderMail(report);
+  renderTech(report);
 }
 
 $('recheck').addEventListener('click', () => {

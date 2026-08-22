@@ -12,7 +12,7 @@
 import type { Sensitivity } from '../core/score.js';
 import type { UserMark } from '../shared/settings.js';
 import { clearMark, getMarks, getSettings, getStats, setSettings } from '../shared/settings.js';
-import { Iris, injectIrisCss } from '../ui/iris.js';
+import { attachScrollCompanion, Iris, injectIrisCss, type TagAlong } from '../ui/iris.js';
 import { Stepper, STEPPER_CSS, type Step } from '../ui/stepper.js';
 import type { Message } from '../shared/messages.js';
 
@@ -37,6 +37,7 @@ const controls = {
 };
 
 let headerIris: Iris | undefined;
+let tagAlong: TagAlong | undefined;
 
 function ago(ts: number): string {
   if (!ts) return 'never';
@@ -172,7 +173,10 @@ function wire(): void {
   const bind = (input: HTMLInputElement, key: 'enabled' | 'showBanner' | 'siteReport' | 'useRdap' | 'useFeeds' | 'useSafeBrowsing') => {
     input.addEventListener('change', () => {
       void setSettings({ [key]: input.checked });
-      if (key === 'enabled') headerIris?.setExpression(input.checked ? 'happy' : 'sleepy');
+      if (key === 'enabled') {
+        headerIris?.setExpression(input.checked ? 'happy' : 'sleepy');
+        tagAlong?.setExpression(input.checked ? 'happy' : 'sleepy');
+      }
     });
   };
   bind(controls.enabled, 'enabled');
@@ -282,8 +286,15 @@ async function init(): Promise<void> {
   await loadSettings();
   wire();
 
-  headerIris = new Iris($('iris'), { size: 72 });
+  headerIris = new Iris($('iris'), { size: 72, drift: true });
   headerIris.setExpression(controls.enabled.checked ? 'happy' : 'sleepy');
+
+  // The settings page is long; without this she scrolls away and never comes back.
+  const anchor = document.querySelector('.hd');
+  if (anchor) {
+    tagAlong = attachScrollCompanion(anchor, 52);
+    tagAlong.setExpression(controls.enabled.checked ? 'happy' : 'sleepy');
+  }
 
   const firstRun = new URLSearchParams(location.search).has('welcome');
   $('welcome').hidden = !firstRun;

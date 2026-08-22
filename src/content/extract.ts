@@ -8,6 +8,7 @@
  */
 import type { DomEvidence } from '../core/types.js';
 import { parseHost } from '../core/util/domain.js';
+import type { TechFacts } from '../services/report.js';
 import { BRAND_TOKENS } from '../core/data/brands.js';
 
 const OBFUSCATION_MARKERS = [
@@ -162,5 +163,81 @@ export function extractDomEvidence(): DomEvidence {
     contextMenuBlocked: contextMenuBlocked(),
     obfuscationScore: obfuscationScore(),
     ...nav,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Technology facts for the site report.
+//
+// None of this scores anything — it is there because "what is this site?" is a
+// question people actually have, and the page itself answers a lot of it for
+// free. No network call, no privacy cost: it never leaves the extension.
+// ---------------------------------------------------------------------------
+
+
+/** Fingerprints that are cheap, reliable and do not need the whole page's source. */
+const FRAMEWORK_HINTS: Array<[string, () => boolean]> = [
+  ['WordPress', () => /wp-content|wp-includes/.test(document.documentElement.innerHTML.slice(0, 60_000))],
+  ['Shopify', () => 'Shopify' in window || /cdn\.shopify\.com/.test(document.documentElement.innerHTML.slice(0, 60_000))],
+  ['Wix', () => /static\.wixstatic\.com|wix\.com/.test(document.documentElement.innerHTML.slice(0, 60_000))],
+  ['Squarespace', () => /squarespace/i.test(document.documentElement.innerHTML.slice(0, 60_000))],
+  ['Webflow', () => document.documentElement.hasAttribute('data-wf-page')],
+  ['React', () => Boolean(document.querySelector('[data-reactroot], #__next')) || '__REACT_DEVTOOLS_GLOBAL_HOOK__' in window],
+  ['Vue', () => Boolean(document.querySelector('[data-v-app], [data-server-rendered]'))],
+  ['Angular', () => Boolean(document.querySelector('[ng-version]'))],
+  ['Next.js', () => Boolean(document.getElementById('__NEXT_DATA__'))],
+  ['Nuxt', () => Boolean(document.getElementById('__NUXT__'))],
+  ['Cloudflare', () => /cdn-cgi\//.test(document.documentElement.innerHTML.slice(0, 30_000))],
+  ['Google Analytics', () => /googletagmanager|google-analytics/.test(document.documentElement.innerHTML.slice(0, 60_000))],
+];
+
+function hostOf(url: string): string | null {
+  try {
+    return new URL(url, location.href).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+export function extractTechFacts(): TechFacts {
+  const here = parseHost(location.hostname).registrableDomain;
+
+  const scriptHosts = new Set<string>();
+  const scripts = Array.from(document.querySelectorAll<HTMLScriptElement>('script[src]'));
+  for (const s of scripts) {
+    const host = hostOf(s.src);
+    if (host && parseHost(host).registrableDomain !== here) scriptHosts.add(host);
+  }
+
+  const linkHosts = new Set<string>();
+  for (const a of Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href]')).slice(0, 300)) {
+    const host = hostOf(a.href);
+    if (host && parseHost(host).registrableDomain !== here) linkHosts.add(host);
+  }
+
+  const frameworks: string[] = [];
+  for (const [name, test] of FRAMEWORK_HINTS) {
+    try {
+      if (test()) frameworks.push(name);
+    } catch {
+      // A hostile page can make any of these throw. Skip and carry on.
+    }
+  }
+
+  return {
+    generator: document.querySelector('meta[name="generator"]')?.getAttribute('content') ?? undefined,
+    title: document.title.slice(0, 160) || undefined,
+    description:
+      document.querySelector('meta[name="description"]')?.getAttribute('content')?.slice(0, 300) ?? undefined,
+    externalScriptHosts: [...scriptHosts].slice(0, 12),
+    externalLinkHosts: [...linkHosts].slice(0, 12),
+    frameworks,
+    formCount: document.querySelectorAll('form').length,
+    hasPasswordField: document.querySelector('input[type="password"]') !== null,
+    resourceCounts: {
+      scripts: scripts.length,
+      images: document.querySelectorAll('img').length,
+      iframes: document.querySelectorAll('iframe').length,
+    },
   };
 }

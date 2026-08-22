@@ -15,7 +15,7 @@ const firedIds = (url: string) => scoreUrl(url).signals.map((s) => s.id);
 describe('URL tier — legitimate sites stay clean', () => {
   const legit = [
     'https://www.google.com/search?q=test',
-    'https://github.com/AryanDhingraa',
+    'https://github.com/AryannDhingraa',
     'https://www.commbank.com.au/personal.html',
     'https://my.gov.au/',
     'https://www.paypal.com/au/signin',
