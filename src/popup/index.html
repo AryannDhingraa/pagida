@@ -7,36 +7,48 @@
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <header class="brand">
-    <h1>PAGIDA</h1>
-    <button class="icon-btn" id="open-options" title="Options" aria-label="Open options">⚙</button>
-  </header>
-
   <main id="app">
-    <section class="readout" id="readout" hidden>
-      <div class="meter-row">
-        <span class="label">RISK</span>
-        <div class="meter" role="img" aria-label="Risk meter"><div class="fill" id="meter-fill"></div></div>
-        <span class="score" id="score">--</span>
+    <section class="top">
+      <div class="face" id="iris"></div>
+      <div class="say">
+        <h1 id="headline">Checking this page…</h1>
+        <p class="host mono" id="host"></p>
       </div>
-      <p class="verdict" id="verdict">SCANNING</p>
-      <p class="host" id="host"></p>
     </section>
 
-    <section class="signals" id="signals-section" hidden>
-      <p class="label sig-head"><span id="signal-count">0 signals</span></p>
+    <p class="advice" id="advice">One moment.</p>
+
+    <section class="score" id="score-block" hidden>
+      <div class="meter"><i id="meter"></i></div>
+      <div class="scale">
+        <span class="label" id="band-name">Nothing found</span>
+        <span class="num" id="score">0</span>
+      </div>
+    </section>
+
+    <section class="found" id="found" hidden>
+      <h2 class="label" id="found-count">What I found</h2>
       <ul id="signals"></ul>
     </section>
 
-    <section class="state" id="state">
-      <p class="dim" id="state-text">Checking this page…</p>
+    <section class="empty" id="empty" hidden>
+      <p id="empty-text"></p>
     </section>
   </main>
 
-  <footer class="actions" id="actions" hidden>
-    <button id="report" class="primary">report phishing</button>
-    <button id="trust" class="ok">mark safe</button>
-    <button id="undo" hidden>undo my call</button>
+  <footer>
+    <div class="acts" id="acts" hidden>
+      <button id="primary" class="solid">Looks fine</button>
+      <button id="secondary">Report this site</button>
+      <button id="undo" hidden>Undo my choice</button>
+    </div>
+    <div class="links">
+      <button class="linkish" id="report-link">
+        Full site report
+        <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+      <button class="linkish quiet" id="options-link">Settings</button>
+    </div>
   </footer>
   <script src="popup.js"></script>
 </body>

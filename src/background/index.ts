@@ -12,6 +12,7 @@ import { parseHost } from '../core/util/domain.js';
 import { domainAgeDays } from '../services/rdap.js';
 import { fetchFeed, loadFeed, normaliseUrl, saveFeed } from '../services/feeds.js';
 import { safeBrowsingLookup } from '../services/safebrowsing.js';
+import { buildReport } from '../services/report.js';
 import {
   bumpStat, clearMark, getMarks, getSettings, setMark, STORAGE_DEFAULTS,
 } from '../shared/settings.js';
@@ -149,10 +150,14 @@ chrome.runtime.onMessage.addListener((msg: Message, sender, sendResponse) => {
           await paintBadge(tabId, verdict);
           if (isNewPage) await bumpStat('pagesScanned');
 
-          if (verdict.band === 'danger') {
-            if (isNewPage || previous?.band !== 'danger') await bumpStat('warnings');
+          // Iris steps onto the page from "suspicious" upward, not only at the
+          // top band — the old build stayed silent through the whole middle of
+          // the range, which is where most real judgement calls live.
+          const speaks = verdict.band === 'suspicious' || verdict.band === 'danger';
+          if (speaks) {
+            if (isNewPage || previous?.band !== verdict.band) await bumpStat('warnings');
             if (settings.showBanner && verdict.override !== 'trusted') {
-              chrome.tabs.sendMessage(tabId, { type: 'SHOW_BANNER', verdict } satisfies Message)
+              chrome.tabs.sendMessage(tabId, { type: 'SHOW_COMPANION', verdict } satisfies Message)
                 .catch(() => { /* tab closed or navigated away */ });
             }
           }
@@ -189,7 +194,7 @@ chrome.runtime.onMessage.addListener((msg: Message, sender, sendResponse) => {
             verdictCache.set(tabId, verdict);
             await paintBadge(tabId, verdict);
             if (msg.verdict === 'safe') {
-              chrome.tabs.sendMessage(tabId, { type: 'HIDE_BANNER' } satisfies Message).catch(() => {});
+              chrome.tabs.sendMessage(tabId, { type: 'HIDE_COMPANION' } satisfies Message).catch(() => {});
             }
           }
           return sendResponse({ ok: true, verdict });
@@ -205,6 +210,22 @@ chrome.runtime.onMessage.addListener((msg: Message, sender, sendResponse) => {
           if (!snapshot) return sendResponse({ ok: false, error: 'feed-unavailable' });
           await saveFeed(snapshot);
           return sendResponse({ ok: true, feedCount: snapshot.urls.length, updatedAt: snapshot.updatedAt });
+        }
+
+        case 'BUILD_REPORT': {
+          // The verdict comes first so the report can lead with it, and so a
+          // slow lookup never delays the part the user actually asked about.
+          const verdict = await score(msg.url);
+          const report = await buildReport(msg.url, verdict ?? undefined);
+          if (!report) return sendResponse({ ok: false, error: 'not-analysable' });
+          return sendResponse({ ok: true, report });
+        }
+
+        case 'OPEN_REPORT': {
+          await chrome.tabs.create({
+            url: chrome.runtime.getURL(`report.html?u=${encodeURIComponent(msg.url)}`),
+          });
+          return sendResponse({ ok: true });
         }
 
         case 'RESCAN':
@@ -230,12 +251,12 @@ function installMenus(): void {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
       id: MENU_CHECK,
-      title: 'Check this link with Pagida',
+      title: 'Ask Iris about this link',
       contexts: ['link'],
     });
     chrome.contextMenus.create({
       id: MENU_REPORT,
-      title: 'Report this link as phishing',
+      title: 'Report this link as a scam',
       contexts: ['link'],
     });
   });
@@ -247,7 +268,7 @@ chrome.contextMenus.onClicked.addListener((info) => {
 
   if (info.menuItemId === MENU_CHECK) {
     void chrome.tabs.create({
-      url: chrome.runtime.getURL(`link.html?u=${encodeURIComponent(url)}`),
+      url: chrome.runtime.getURL(`report.html?u=${encodeURIComponent(url)}`),
     });
   } else if (info.menuItemId === MENU_REPORT) {
     void (async () => {
@@ -259,7 +280,7 @@ chrome.contextMenus.onClicked.addListener((info) => {
       });
       await bumpStat('reports');
       await chrome.tabs.create({
-        url: chrome.runtime.getURL(`link.html?u=${encodeURIComponent(url)}&reported=1`),
+        url: chrome.runtime.getURL(`report.html?u=${encodeURIComponent(url)}`),
       });
     })();
   }

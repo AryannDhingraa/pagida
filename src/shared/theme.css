@@ -1,110 +1,145 @@
 /* -----------------------------------------------------------------------------
-   Pagida — Console theme
-   Shared tokens for the popup, options page and link checker.
+   Pagida — Aurora
+   Shared tokens for the popup, options page, site report and link checker.
 
-   One deliberate decision: this UI is dark-only. It is a status readout that
-   appears for two seconds over whatever page you are on, and a fixed dark
-   surface reads consistently against every one of them. Every colour is
-   declared explicitly so nothing inherits from the host page.
+   Built light on purpose. Pagida is for people who get phished, not for people
+   who read hex dumps, so the ground is near-white, the type is 13-15px, and the
+   only saturated colour on screen is one that means something.
    -------------------------------------------------------------------------- */
 
 :root {
-  --bg: #0B0E11;
-  --panel: #12171C;
-  --panel-2: #171E24;
-  --line: #1F272F;
-  --line-soft: #171E24;
+  /* ground — a hair off pure white, warm-biased so the cool aurora reads against it */
+  --paper: #FDFDFC;
+  --surface: #FFFFFF;
+  --surface-2: #F6F6F3;
+  --surface-3: #F0EFEA;
 
-  --fg: #D8E2E8;
-  --fg-2: #A2B0BA;
-  --fg-dim: #6F808C;
+  --ink: #1B1E24;
+  --ink-2: #5A6371;
+  --ink-3: #8A929E;
 
-  --clean: #4ADE80;
-  --caution: #56C7F0;
-  --suspicious: #F5B740;
-  --danger: #F87171;
+  --line: #ECEAE4;
+  --line-soft: #F4F3EE;
 
-  --clean-dim: #163024;
-  --caution-dim: #102A36;
-  --suspicious-dim: #2E2410;
-  --danger-dim: #2E1414;
+  --brand: #7B6BF0;
+  --brand-2: #9C8FFF;
+  --brand-wash: #F3F1FE;
 
-  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
-    "Liberation Mono", monospace;
+  /* aurora — Iris's body. Not used as interface colour anywhere else. */
+  --aur-1: #6FEBDA;
+  --aur-2: #7BB4FF;
+  --aur-3: #B49BFF;
 
-  --band: var(--clean);
-  --band-dim: var(--clean-dim);
+  /* risk bands — a separate family from the brand, on purpose */
+  --safe: #12A672;      --safe-wash: #EBF8F2;    --safe-line: #C9EDDD;
+  --notice: #3D7FEA;    --notice-wash: #EDF3FE;  --notice-line: #CFE0FB;
+  --caution: #C67C0A;   --caution-wash: #FEF6E7; --caution-line: #F6E3BC;
+  --danger: #DC3E31;    --danger-wash: #FDEEEC;  --danger-line: #F8CFC9;
+
+  --shadow-s: 0 1px 2px rgba(27,30,36,.04), 0 3px 10px -6px rgba(27,30,36,.10);
+  --shadow-m: 0 1px 3px rgba(27,30,36,.04), 0 14px 34px -18px rgba(27,30,36,.22);
+  --shadow-l: 0 2px 6px rgba(27,30,36,.04), 0 32px 70px -34px rgba(27,30,36,.30);
+
+  --r-xs: 6px; --r-s: 10px; --r-m: 14px; --r-l: 20px; --r-xl: 26px;
+
+  /* Power3-out. Every transition in Pagida uses this or nothing. */
+  --ease: cubic-bezier(.22, 1, .36, 1);
+
+  --font: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI",
+          Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  /* the current risk band, set on <html> by each page */
+  --band: var(--safe);
+  --band-wash: var(--safe-wash);
+  --band-line: var(--safe-line);
 }
 
-[data-band="caution"]    { --band: var(--caution);    --band-dim: var(--caution-dim); }
-[data-band="suspicious"] { --band: var(--suspicious); --band-dim: var(--suspicious-dim); }
-[data-band="danger"]     { --band: var(--danger);     --band-dim: var(--danger-dim); }
+/* The band names here are the engine's, not the palette's: a "caution" verdict
+   is the mild one and paints blue, while "suspicious" is the amber one. Getting
+   these two crossed silently paints a suspicious page green, so they are mapped
+   explicitly rather than by matching names. */
+[data-band="clean"]      { --band: var(--safe);    --band-wash: var(--safe-wash);    --band-line: var(--safe-line); }
+[data-band="caution"]    { --band: var(--notice);  --band-wash: var(--notice-wash);  --band-line: var(--notice-line); }
+[data-band="suspicious"] { --band: var(--caution); --band-wash: var(--caution-wash); --band-line: var(--caution-line); }
+[data-band="danger"]     { --band: var(--danger);  --band-wash: var(--danger-wash);  --band-line: var(--danger-line); }
 
 * { box-sizing: border-box; }
-
-/* The `hidden` attribute must beat any display rule we set on a class. */
 [hidden] { display: none !important; }
 
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--fg);
-  font: 400 12.5px/1.55 var(--mono);
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 14px/1.6 var(--font);
   -webkit-font-smoothing: antialiased;
 }
 
-a { color: var(--band); text-underline-offset: 2px; }
+h1, h2, h3, h4 { margin: 0; font-weight: 600; letter-spacing: -.015em; }
 
-/* --- shared primitives ---------------------------------------------------- */
-
-.brand {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 11px 14px; border-bottom: 1px solid var(--line);
-  background: var(--panel);
-}
-.brand h1 {
-  margin: 0; font-size: 12px; font-weight: 700;
-  letter-spacing: .22em; color: var(--fg);
-}
-.brand .ver { font-size: 10px; color: var(--fg-dim); letter-spacing: .1em; }
-
-.icon-btn {
-  background: none; border: 0; cursor: pointer; padding: 3px 5px;
-  color: var(--fg-dim); font: inherit; font-size: 13px; border-radius: 3px;
-}
-.icon-btn:hover { color: var(--fg); background: var(--panel-2); }
+a { color: var(--brand); text-underline-offset: 2px; }
 
 button, .btn {
-  font: inherit; cursor: pointer;
-  background: transparent; color: var(--fg-2);
-  border: 1px solid var(--line); border-radius: 3px;
-  padding: 7px 10px; letter-spacing: .04em;
-  transition: border-color .12s, color .12s, background .12s;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-2);
+  padding: 9px 15px;
+  transition: border-color 200ms var(--ease), color 200ms var(--ease),
+              background 200ms var(--ease), transform 120ms var(--ease);
 }
-button:hover, .btn:hover { color: var(--fg); border-color: var(--fg-dim); }
-button:disabled { opacity: .45; cursor: default; }
-button.primary {
-  border-color: var(--danger); color: var(--danger);
+button:hover { border-color: var(--ink-3); color: var(--ink); }
+button:active { transform: scale(.975); }
+button:disabled { opacity: .45; cursor: default; transform: none; }
+
+button.solid {
+  background: var(--band);
+  border-color: var(--band);
+  color: #fff;
 }
-button.primary:hover { background: var(--danger-dim); color: #FCA5A5; }
-button.ok { border-color: var(--clean); color: var(--clean); }
-button.ok:hover { background: var(--clean-dim); }
+button.solid:hover { filter: brightness(1.06); border-color: var(--band); color: #fff; }
 
-:focus-visible { outline: 2px solid var(--band); outline-offset: 2px; }
+button.brand { background: var(--brand); border-color: var(--brand); color: #fff; }
+button.brand:hover { filter: brightness(1.07); color: #fff; }
 
-.dim { color: var(--fg-dim); }
+input[type="text"], input[type="password"], select {
+  font: inherit;
+  font-size: 13px;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--r-s);
+  padding: 9px 11px;
+  transition: border-color 200ms var(--ease), box-shadow 200ms var(--ease);
+}
+input:focus, select:focus {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-wash);
+}
+
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 6px; }
+
 .label {
-  font-size: 9.5px; letter-spacing: .16em; text-transform: uppercase;
-  color: var(--fg-dim);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: var(--ink-3);
 }
+.dim { color: var(--ink-3); }
+.mono { font-family: var(--mono); }
 
 hr { border: 0; border-top: 1px solid var(--line); margin: 0; }
 
-::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: var(--fg-dim); }
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--line); border-radius: 999px; border: 2px solid var(--surface); }
+::-webkit-scrollbar-thumb:hover { background: var(--ink-3); }
 
 @media (prefers-reduced-motion: reduce) {
-  * { animation: none !important; transition: none !important; }
+  *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
 }

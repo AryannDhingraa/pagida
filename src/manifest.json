@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Pagida — Phishing Detector",
+  "name": "Pagida \u2014 Phishing Detector",
   "version": "1.0.0",
-  "description": "Scores every page for phishing risk and shows you exactly which warning signs it found. Runs locally. No tracking.",
+  "description": "Iris checks every page for scams and shows you exactly what she found, in plain English. Runs locally. No tracking.",
   "author": "Aryan Dhingra",
   "homepage_url": "https://github.com/AryanDhingraa/pagida",
   "minimum_chrome_version": "116",
@@ -14,7 +14,7 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Pagida — checking this page",
+    "default_title": "Pagida \u2014 Iris is watching this page",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",
@@ -29,17 +29,29 @@
   },
   "content_scripts": [
     {
-      "matches": ["http://*/*", "https://*/*"],
-      "js": ["content.js"],
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_idle",
       "all_frames": false
     }
   ],
-  "permissions": ["storage", "contextMenus", "alarms"],
+  "permissions": [
+    "storage",
+    "contextMenus",
+    "alarms"
+  ],
   "host_permissions": [
     "https://rdap.org/*",
     "https://raw.githubusercontent.com/*",
-    "https://safebrowsing.googleapis.com/*"
+    "https://safebrowsing.googleapis.com/*",
+    "https://cloudflare-dns.com/*",
+    "https://internetdb.shodan.io/*",
+    "https://crt.sh/*"
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'none'"

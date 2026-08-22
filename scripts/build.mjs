@@ -26,7 +26,7 @@ const bundles = [
   { in: 'src/content/index.ts', out: 'content', format: 'iife' },
   { in: 'src/popup/popup.ts', out: 'popup', format: 'iife' },
   { in: 'src/options/options.ts', out: 'options', format: 'iife' },
-  { in: 'src/link/link.ts', out: 'link', format: 'iife' },
+  { in: 'src/report/report.ts', out: 'report', format: 'iife' },
 ];
 
 const common = {
@@ -49,7 +49,7 @@ async function copyStatic() {
 
   await cp(resolve(root, 'public/icons'), resolve(outdir, 'icons'), { recursive: true });
 
-  for (const page of ['popup', 'options', 'link']) {
+  for (const page of ['popup', 'options', 'report']) {
     await cp(resolve(root, `src/${page}/index.html`), resolve(outdir, `${page}.html`));
     await cp(resolve(root, `src/${page}/${page}.css`), resolve(outdir, `${page}.css`));
   }

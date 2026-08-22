@@ -1,6 +1,6 @@
 {
   "name": "pagida",
-  "version": "1.0.1",
+  "version": "2.0.0",
   "description": "Pagida \u2014 explainable, local-first phishing detection for Chrome. Scores every page you visit against 20+ weighted signals and tells you exactly why.",
   "type": "module",
   "private": true,

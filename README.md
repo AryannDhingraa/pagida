@@ -6,14 +6,14 @@
 
 **A phishing detector for Chrome that shows its working.**
 
-Every page gets a risk score out of 100, and every point of that score traces
-back to a named warning sign you can read for yourself. No machine-learning
+Iris checks every page you open and tells you, in a sentence, whether to trust
+it — then shows you every single reason behind that answer. No machine-learning
 black box, no account, no server, nothing sent anywhere by default.
 
 [![CI](https://github.com/AryanDhingraa/pagida/actions/workflows/ci.yml/badge.svg)](https://github.com/AryanDhingraa/pagida/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Manifest V3](https://img.shields.io/badge/manifest-v3-blue.svg)](src/manifest.json)
-[![Tests](https://img.shields.io/badge/tests-77%20passing-brightgreen.svg)](test)
+[![Tests](https://img.shields.io/badge/tests-79%20passing-brightgreen.svg)](test)
 
 *παγίδα — Greek for "trap".*
 
@@ -22,7 +22,7 @@ black box, no account, no server, nothing sent anywhere by default.
 ---
 
 <div align="center">
-<img src="docs/img/popup-danger.png" width="330" alt="Pagida flagging a phishing page with a score of 92 and a breakdown of every signal that fired">
+<img src="docs/img/iris-faces.png" width="760" alt="Iris, the Pagida mascot, in eleven expressions from calm through worried to alarmed and angry">
 </div>
 
 ---
@@ -30,11 +30,13 @@ black box, no account, no server, nothing sent anywhere by default.
 ## What it does
 
 Pagida scores the page you are on against **37 rules across three tiers**, then
-shows you the score, the band, and every single rule that fired with the actual
-evidence that made it fire.
+shows you the verdict, the score, and every single rule that fired with the
+actual evidence that made it fire.
 
-The thing it does differently is the last part. Most phishing tools give you a
-verdict. Pagida gives you the reasoning:
+Two things it does differently. The first is Iris — she sits in the toolbar, her
+expression changes with the risk before you have read anything, and she steps
+onto the page itself when something is genuinely wrong. The second is that the
+reasoning is all there, in ordinary words:
 
 > **Login form sends your password elsewhere** &nbsp;`+32`
 > The password box on this page submits to `collector-node4.tk`, not to
@@ -42,6 +44,24 @@ verdict. Pagida gives you the reasoning:
 
 You can disagree with it, and you can learn from it. Both matter more than the
 number.
+
+## The site report
+
+A verdict tells you what to do. A report tells you why you should believe it.
+Open it from the popup and Pagida gathers everything it can find about a domain
+from free public sources — no key, no account, nothing sent but the domain name
+and an IP address:
+
+| Tab | What it answers |
+|---|---|
+| **Risk** | Every signal that fired, its weight, and how the score is built |
+| **The site** | Who registered the name, when, through whom, and how long it has actually been a live website |
+| **Where it lives** | The IP, other names on it, what ports are open, and any publicly recorded weaknesses |
+| **Email & trust** | Whether the domain can send mail, and whether it publishes SPF and DMARC |
+
+Every field that cannot be fetched shows as **Unknown** rather than being left
+out, because a blank row is a lie by omission when the whole point is helping
+someone judge a site for themselves.
 
 ## Install
 
@@ -184,7 +204,7 @@ Everything you mark is listed in Options, removable one by one, and exportable
 as JSON.
 
 <div align="center">
-<img src="docs/img/link-danger.png" width="560" alt="The link checker scoring a link without opening it">
+<img src="docs/img/report.png" width="720" alt="The Pagida site report, showing the risk verdict, every signal that fired, and where each fact came from">
 </div>
 
 ## Permissions, and why each one is needed
@@ -198,6 +218,9 @@ as JSON.
 | `https://rdap.org/*` | Domain-age lookups. |
 | `https://raw.githubusercontent.com/*` | The OpenPhish blocklist. |
 | `https://safebrowsing.googleapis.com/*` | Only used if you enable Safe Browsing and provide a key. |
+| `https://cloudflare-dns.com/*` | DNS lookups for the site report — mail records, SPF, DMARC. |
+| `https://internetdb.shodan.io/*` | Reads Shodan's public record of an IP for the site report. Pagida never scans anything itself. |
+| `https://crt.sh/*` | Certificate history for the site report — when a site first went live. |
 
 There is no `tabs` permission. Pagida never reads your tab list or your history.
 
@@ -211,10 +234,11 @@ src/
 │   ├── data/          ← brands, TLD lists, generated allowlist
 │   ├── evidence.ts    ← URL → PageEvidence
 │   └── score.ts       ← PageEvidence → Verdict
-├── content/           ← reads the page, sends a summary, draws the warning bar
+├── ui/                ← iris (the mascot) · stepper — shared across every page
+├── content/           ← reads the page, sends a summary, brings Iris onto it
 ├── background/        ← service worker: orchestration, caching, context menus
-├── services/          ← rdap · feeds · safebrowsing (each fails soft)
-├── popup/ options/ link/
+├── services/          ← rdap · feeds · safebrowsing · dns · netinfo · certs · report
+├── popup/ options/ report/
 └── manifest.json
 ```
 
@@ -228,7 +252,7 @@ shipped engine rather than a reimplementation of it.
 ```bash
 npm install
 npm run dev          # rebuild on change — load dist/ as an unpacked extension
-npm test             # 77 unit tests
+npm test             # 79 unit tests
 npm run typecheck
 npm run lint
 npm run evaluate     # fetch today's feeds and re-measure
@@ -262,6 +286,7 @@ blind spots is worse than one that has them.
 ## Roadmap
 
 - [ ] Chrome Web Store listing (submitted, in review)
+- [ ] Miner and skimmer detection — the one thing Netcraft does that Pagida does not
 - [ ] Firefox build — the code is MV3, the manifest needs a variant
 - [ ] Full Public Suffix List, compiled down at build time
 - [ ] A second opinion tier: optional VirusTotal and urlscan.io enrichment

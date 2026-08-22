@@ -165,3 +165,26 @@ describe('re-scan fingerprint', () => {
     expect(a).toBe(b);
   });
 });
+
+describe('band names line up with the stylesheet', () => {
+  it('uses exactly the four names theme.css styles', async () => {
+    const css = await import('node:fs').then((fs) =>
+      fs.readFileSync(new URL('../src/shared/theme.css', import.meta.url), 'utf8'));
+    // Every band the engine can produce must have a rule, or that verdict
+    // renders in whatever colour the previous one left behind.
+    for (const band of ['clean', 'caution', 'suspicious', 'danger']) {
+      expect(css, `theme.css is missing [data-band="${band}"]`).toContain(`[data-band="${band}"]`);
+    }
+  });
+
+  it('maps each band to the intended colour family', async () => {
+    const css = await import('node:fs').then((fs) =>
+      fs.readFileSync(new URL('../src/shared/theme.css', import.meta.url), 'utf8'));
+    const ruleFor = (band: string) =>
+      css.split('\n').find((l) => l.startsWith(`[data-band="${band}"]`)) ?? '';
+    expect(ruleFor('clean')).toContain('var(--safe)');
+    expect(ruleFor('caution')).toContain('var(--notice)');
+    expect(ruleFor('suspicious')).toContain('var(--caution)');
+    expect(ruleFor('danger')).toContain('var(--danger)');
+  });
+});

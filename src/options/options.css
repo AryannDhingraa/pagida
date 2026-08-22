@@ -1,68 +1,72 @@
-body { background: var(--bg); }
-.page { max-width: 720px; margin: 0 auto; padding-bottom: 48px; }
+body { background: var(--paper); }
+.page { max-width: 720px; margin: 0 auto; padding: 0 22px 72px; }
 
-.welcome {
-  margin: 16px 18px 0; padding: 14px 16px;
-  border: 1px solid var(--clean); border-radius: 4px; background: var(--clean-dim);
+/* --- onboarding --- */
+.welcome { padding: 56px 0; display: grid; place-items: center; }
+.welcome .card {
+  width: 100%; max-width: 560px; background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--r-xl);
+  box-shadow: var(--shadow-m); padding: 28px 30px 26px;
 }
-.welcome p { margin: 0 0 8px; font-size: 12px; }
-.welcome p:last-child { margin-bottom: 0; }
+.meet { display: flex; gap: 18px; align-items: center; margin-bottom: 4px; }
+.meet .face { flex-shrink: 0; }
 
-section { padding: 22px 18px 4px; border-bottom: 1px solid var(--line); }
-section h2 { margin: 0 0 4px; }
-.note { margin: 0 0 12px; font-size: 11px; color: var(--fg-dim); max-width: 62ch; }
+/* --- header --- */
+.hd { display: flex; align-items: center; gap: 16px; padding: 40px 0 8px; }
+.hd .face { flex-shrink: 0; }
+.hd h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -.03em; }
+.hd p { margin: 2px 0 0; font-size: 12.5px; }
+.hd .ghost { margin-left: auto; font-size: 12.5px; }
+
+section { padding: 26px 0 6px; border-bottom: 1px solid var(--line); }
+section h2 { font-size: 1.1rem; font-weight: 700; letter-spacing: -.02em; margin-bottom: 4px; }
+.intro { margin: 0 0 14px; font-size: 13px; color: var(--ink-3); max-width: 64ch; }
 
 .row {
-  display: flex; align-items: flex-start; gap: 14px;
-  padding: 12px 0; border-top: 1px solid var(--line-soft);
+  display: flex; align-items: flex-start; gap: 16px;
+  padding: 14px 0; border-top: 1px solid var(--line-soft);
 }
 .row:first-of-type { border-top: 0; }
-.rowtext { flex: 1; display: block; }
-.rowtext > b { display: block; font-size: 12px; font-weight: 600; color: var(--fg); }
-.rowtext > em {
-  display: block; font-style: normal; font-size: 11px;
-  color: var(--fg-dim); margin-top: 3px; max-width: 60ch;
+.row.btns { gap: 10px; }
+.txt { flex: 1; }
+.txt > b { display: block; font-size: 14px; font-weight: 600; color: var(--ink); }
+.txt > em {
+  display: block; font-style: normal; font-size: 13px; color: var(--ink-3);
+  margin-top: 3px; max-width: 62ch; line-height: 1.55;
 }
-.rowtext code { color: var(--fg-2); }
+.txt code { font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
 
 .toggle { cursor: pointer; }
-.toggle input { margin: 2px 0 0; accent-color: var(--clean); width: 15px; height: 15px; }
+.toggle input { margin: 3px 0 0; width: 17px; height: 17px; accent-color: var(--brand); flex-shrink: 0; }
 
-select, input[type="password"] {
-  font: inherit; font-size: 11.5px;
-  background: var(--panel-2); color: var(--fg);
-  border: 1px solid var(--line); border-radius: 3px; padding: 6px 8px;
-  min-width: 190px;
-}
+select, input[type="password"] { min-width: 210px; }
 
-.marks { list-style: none; margin: 0 0 12px; padding: 0; }
+.marks { list-style: none; margin: 0 0 14px; padding: 0; }
 .marks li {
-  display: flex; align-items: center; gap: 10px;
-  padding: 9px 0; border-top: 1px solid var(--line-soft); font-size: 11.5px;
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 0; border-top: 1px solid var(--line-soft); font-size: 13px;
 }
 .marks .tag {
-  font-size: 9.5px; letter-spacing: .12em; padding: 2px 6px;
-  border: 1px solid currentColor; border-radius: 2px;
+  font-size: 10px; font-weight: 700; letter-spacing: .09em; padding: 3px 8px;
+  border-radius: 999px; text-transform: uppercase;
 }
-.marks .tag.phishing { color: var(--danger); }
-.marks .tag.safe { color: var(--clean); }
-.marks .h { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.marks .when { color: var(--fg-dim); font-size: 10.5px; }
-.marks button { padding: 3px 8px; font-size: 10.5px; }
+.marks .tag.phishing { background: var(--danger-wash); color: var(--danger); }
+.marks .tag.safe { background: var(--safe-wash); color: var(--safe); }
+.marks .h { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 12.5px; }
+.marks .when { color: var(--ink-3); font-size: 12px; }
+.marks button { padding: 5px 11px; font-size: 12px; }
 
-.stats { display: flex; gap: 28px; padding: 4px 0 14px; }
-.stats div { display: flex; flex-direction: column; gap: 2px; }
+.stats { display: flex; gap: 32px; flex-wrap: wrap; padding: 2px 0 16px; }
+.stats div { display: flex; flex-direction: column; gap: 3px; }
 .stats span {
-  font-size: 22px; font-weight: 700; color: var(--fg);
-  font-variant-numeric: tabular-nums; line-height: 1;
+  font-size: 26px; font-weight: 700; color: var(--ink); line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 .stats em {
-  font-style: normal; font-size: 10px; letter-spacing: .1em;
-  text-transform: uppercase; color: var(--fg-dim);
+  font-style: normal; font-size: 11px; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--ink-3);
 }
 
-.foot {
-  display: flex; gap: 20px; padding: 18px; font-size: 11px;
-}
-.foot a { color: var(--fg-dim); }
-.foot a:hover { color: var(--fg); }
+.foot { display: flex; gap: 22px; padding: 22px 0 0; font-size: 13px; flex-wrap: wrap; }
+.foot a { color: var(--ink-3); }
+.foot a:hover { color: var(--ink); }

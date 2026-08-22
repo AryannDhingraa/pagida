@@ -61,7 +61,23 @@ visit is sent to Google, subject to
 
 Switch it on: Options → Lookups → *Also check Google Safe Browsing*.
 
-### 4. PhishTank — only when you click
+### 4. The site report — only when you open one
+
+Opening a site report makes three further lookups, and only then:
+
+- **`cloudflare-dns.com`** receives the domain name to look up its addresses and
+  mail records.
+- **`internetdb.shodan.io`** receives the IP address the domain resolves to, and
+  returns what Shodan already knows about that machine from its own scanning.
+  Pagida never scans anything itself.
+- **`crt.sh`** receives the domain name and returns its public certificate
+  history.
+
+None of these receives the page you were on. All three run only when you press
+the button, never in the background, and the whole feature can be switched off:
+Options → What I look up → *Full site reports*.
+
+### 5. PhishTank — only when you click
 
 If you report a site as phishing, Pagida asks whether you also want to submit it
 to PhishTank. Saying yes opens PhishTank in a new tab with the URL filled in.

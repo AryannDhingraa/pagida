@@ -4,6 +4,7 @@
  * silently at runtime, which is the usual failure mode in extensions.
  */
 import type { DomEvidence, Verdict } from '../core/types.js';
+import type { SiteReport } from '../services/report.js';
 
 export type Message =
   /** Content script -> worker: here is what the page looks like. */
@@ -18,14 +19,19 @@ export type Message =
   | { type: 'UNMARK_SITE'; hostname: string }
   /** Options -> worker: refresh the phishing feed now. */
   | { type: 'REFRESH_FEED' }
-  /** Worker -> content script: show or hide the warning bar. */
-  | { type: 'SHOW_BANNER'; verdict: Verdict }
-  | { type: 'HIDE_BANNER' }
+  /** Report page -> worker: gather everything you can about this site. */
+  | { type: 'BUILD_REPORT'; url: string }
+  /** Content script -> worker: open the full report for this page. */
+  | { type: 'OPEN_REPORT'; url: string }
+  /** Worker -> content script: bring Iris onto the page, or take her away. */
+  | { type: 'SHOW_COMPANION'; verdict: Verdict }
+  | { type: 'HIDE_COMPANION' }
   /** Popup -> content script: report your signals again, right now. */
   | { type: 'RESCAN' };
 
 export type Response =
   | { ok: true; verdict: Verdict }
+  | { ok: true; report: SiteReport }
   | { ok: true; feedCount: number; updatedAt: number }
   | { ok: true }
   | { ok: false; error: string };

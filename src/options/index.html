@@ -2,120 +2,121 @@
 <html lang="en" data-band="clean">
 <head>
   <meta charset="utf-8">
-  <title>Pagida — Options</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pagida — settings</title>
   <link rel="stylesheet" href="theme.css">
   <link rel="stylesheet" href="options.css">
 </head>
 <body>
 <div class="page">
-  <header class="brand">
-    <h1>PAGIDA</h1>
-    <span class="ver" id="version"></span>
-  </header>
 
-  <div id="welcome" class="welcome" hidden>
-    <p><strong>Pagida is on.</strong> It checks every page you open and puts a
-      score in the toolbar. Green means nothing found. Red means step away from
-      the keyboard.</p>
-    <p class="dim">Nothing you browse is sent anywhere. The two things that do
-      leave your machine are listed under Lookups below, and you can switch both
-      off.</p>
+  <section class="welcome" id="welcome" hidden>
+    <div class="card" id="onboarding"></div>
+  </section>
+
+  <div id="settings" hidden>
+    <header class="hd">
+      <div class="face" id="iris"></div>
+      <div>
+        <h1>Pagida</h1>
+        <p class="dim" id="version"></p>
+      </div>
+      <button id="replay" class="ghost">Show the welcome again</button>
+    </header>
+
+    <section>
+      <h2>Checking</h2>
+      <label class="row toggle">
+        <input type="checkbox" id="enabled">
+        <span class="txt"><b>Check pages as I browse</b>
+          <em>Turn Iris off without uninstalling her.</em></span>
+      </label>
+
+      <div class="row">
+        <span class="txt"><b>How suspicious should I be?</b>
+          <em>This changes how much weight my guesses carry. Things I know for certain — like a site being on a scam list — are never softened.</em></span>
+        <select id="sensitivity">
+          <option value="relaxed">Relaxed — warn me less</option>
+          <option value="balanced">Balanced — recommended</option>
+          <option value="strict">Careful — warn me more</option>
+        </select>
+      </div>
+
+      <label class="row toggle">
+        <input type="checkbox" id="showBanner">
+        <span class="txt"><b>Let me appear on the page</b>
+          <em>When a page looks suspicious I will pop up in the corner with one sentence. Drag me anywhere; close me any time.</em></span>
+      </label>
+    </section>
+
+    <section>
+      <h2>What I look up</h2>
+      <p class="intro">These are the only times anything leaves your computer. Nothing you browse is ever sent anywhere.</p>
+
+      <label class="row toggle">
+        <input type="checkbox" id="useRdap">
+        <span class="txt"><b>How old a website is</b>
+          <em>Sends the domain name on its own — <code>example.com</code>, never the full address. Remembered for a week. This is the single strongest clue I have.</em></span>
+      </label>
+
+      <label class="row toggle">
+        <input type="checkbox" id="useFeeds">
+        <span class="txt"><b>The community scam list</b>
+          <em>Downloads a public list of known scam pages twice a day, then checks against it here on your machine. The pages you visit never leave.</em></span>
+      </label>
+
+      <div class="row">
+        <span class="txt"><b>Scam list</b><em id="feed-status">not loaded yet</em></span>
+        <button id="refresh-feed">Update now</button>
+      </div>
+
+      <label class="row toggle">
+        <input type="checkbox" id="siteReport">
+        <span class="txt"><b>Full site reports</b>
+          <em>Lets me gather everything about a site when you ask for a report — who registered it, where it is hosted, whether it can send email. Only runs when you open a report.</em></span>
+      </label>
+
+      <label class="row toggle">
+        <input type="checkbox" id="useSafeBrowsing">
+        <span class="txt"><b>Also ask Google Safe Browsing</b>
+          <em>Off unless you turn it on, because this is the one that sends the <b>whole address</b> of every page to Google. Needs a free key of your own.</em></span>
+      </label>
+
+      <div class="row">
+        <span class="txt"><b>Your Safe Browsing key</b>
+          <em>Kept on this computer only, and never synced to your Google account.</em></span>
+        <input type="password" id="safeBrowsingKey" placeholder="paste key" autocomplete="off">
+      </div>
+    </section>
+
+    <section>
+      <h2>Sites you have judged</h2>
+      <p class="intro">What you say beats what I think. Remove one and I go back to scoring it normally.</p>
+      <ul id="marks" class="marks"></ul>
+      <p class="dim" id="marks-empty">You have not marked any sites yet.</p>
+      <div class="row btns">
+        <button id="export-marks">Export as JSON</button>
+        <button id="clear-marks">Clear all</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>Since you installed me</h2>
+      <div class="stats">
+        <div><span id="stat-scanned">0</span><em>pages checked</em></div>
+        <div><span id="stat-warnings">0</span><em>times I spoke up</em></div>
+        <div><span id="stat-reports">0</span><em>sites you reported</em></div>
+      </div>
+      <p class="intro">These never leave this browser. There is no account, no server and no analytics.</p>
+    </section>
+
+    <footer class="foot">
+      <a href="https://github.com/AryanDhingraa/pagida" target="_blank" rel="noopener">Source code</a>
+      <a href="https://github.com/AryanDhingraa/pagida/blob/main/PRIVACY.md" target="_blank" rel="noopener">Privacy</a>
+      <a href="https://github.com/AryanDhingraa/pagida/issues" target="_blank" rel="noopener">Report a bug</a>
+    </footer>
   </div>
-
-  <section>
-    <h2 class="label">Detection</h2>
-
-    <label class="row toggle">
-      <input type="checkbox" id="enabled">
-      <span class="rowtext"><b>Check pages as I browse</b>
-        <em>Turn everything off without uninstalling.</em></span>
-    </label>
-
-    <div class="row">
-      <span class="rowtext"><b>Sensitivity</b>
-        <em>How much weight the heuristics carry. Confirmed blocklist matches are never tuned down.</em></span>
-      <select id="sensitivity">
-        <option value="relaxed">relaxed — fewer warnings</option>
-        <option value="balanced">balanced — recommended</option>
-        <option value="strict">strict — more warnings</option>
-      </select>
-    </div>
-
-    <label class="row toggle">
-      <input type="checkbox" id="showBanner">
-      <span class="rowtext"><b>Show a warning bar on dangerous pages</b>
-        <em>Only on the top risk band, and always dismissible.</em></span>
-    </label>
-  </section>
-
-  <section>
-    <h2 class="label">Lookups</h2>
-    <p class="note">These are the only times Pagida talks to the internet.
-      Everything else happens inside your browser.</p>
-
-    <label class="row toggle">
-      <input type="checkbox" id="useRdap">
-      <span class="rowtext"><b>Check how old a domain is</b>
-        <em>Sends the domain name only — <code>example.com</code>, never the full
-          address — to rdap.org. Cached for a week. This is the strongest single
-          warning sign Pagida has.</em></span>
-    </label>
-
-    <label class="row toggle">
-      <input type="checkbox" id="useFeeds">
-      <span class="rowtext"><b>Use the OpenPhish community blocklist</b>
-        <em>Downloads the public list once every 12 hours and matches against it
-          on your machine. The pages you visit are never sent anywhere.</em></span>
-    </label>
-
-    <div class="row feed">
-      <span class="rowtext"><b>Blocklist status</b><em id="feed-status">not loaded</em></span>
-      <button id="refresh-feed">refresh now</button>
-    </div>
-
-    <label class="row toggle">
-      <input type="checkbox" id="useSafeBrowsing">
-      <span class="rowtext"><b>Also check Google Safe Browsing</b>
-        <em>Off by default because this one sends the <b>full address</b> of every
-          page to Google. Needs your own free API key.</em></span>
-    </label>
-
-    <div class="row">
-      <span class="rowtext"><b>Safe Browsing API key</b>
-        <em>Stored on this machine only. Get one free from the Google Cloud console.</em></span>
-      <input type="password" id="safeBrowsingKey" placeholder="paste key" autocomplete="off">
-    </div>
-  </section>
-
-  <section>
-    <h2 class="label">Sites you have judged</h2>
-    <p class="note">Your own calls always beat Pagida's score. Remove one and the
-      normal scoring comes back.</p>
-    <ul id="marks" class="marks"></ul>
-    <p class="dim" id="marks-empty">You have not marked any sites yet.</p>
-    <div class="row">
-      <button id="export-marks">export as JSON</button>
-      <button id="clear-marks">clear all</button>
-    </div>
-  </section>
-
-  <section>
-    <h2 class="label">This install</h2>
-    <div class="stats">
-      <div><span id="stat-scanned">0</span><em>pages checked</em></div>
-      <div><span id="stat-warnings">0</span><em>warnings raised</em></div>
-      <div><span id="stat-reports">0</span><em>sites you reported</em></div>
-    </div>
-    <p class="note">These counters never leave this browser. Pagida has no
-      analytics, no accounts and no server.</p>
-  </section>
-
-  <footer class="foot">
-    <a href="https://github.com/AryanDhingraa/pagida" target="_blank" rel="noopener">source code</a>
-    <a href="https://github.com/AryanDhingraa/pagida/blob/main/PRIVACY.md" target="_blank" rel="noopener">privacy</a>
-    <a href="https://github.com/AryanDhingraa/pagida/issues" target="_blank" rel="noopener">report a bug</a>
-  </footer>
 </div>
-  <script src="options.js"></script>
+<script src="options.js"></script>
 </body>
 </html>

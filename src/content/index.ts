@@ -12,7 +12,7 @@
  * and never more than a handful of times per page.
  */
 import { extractDomEvidence } from './extract.js';
-import { hideBanner, showBanner } from './banner.js';
+import { hideCompanion, showCompanion } from './companion.js';
 import { evidenceSignature } from '../core/evidence.js';
 import type { Message } from '../shared/messages.js';
 
@@ -64,7 +64,7 @@ const observer = new MutationObserver(() => {
     lastSignature = '';
     reportCount = 0;
     sawPasswordField = false;
-    hideBanner();
+    hideCompanion();
     schedule(500);
     return;
   }
@@ -79,14 +79,20 @@ if (document.documentElement) {
 }
 
 chrome.runtime.onMessage.addListener((msg: Message, _sender, sendResponse) => {
-  if (msg.type === 'SHOW_BANNER') {
-    showBanner(msg.verdict, () => {
-      void chrome.runtime.sendMessage({
+  if (msg.type === 'SHOW_COMPANION') {
+    showCompanion(msg.verdict, {
+      onTrust: () => void chrome.runtime.sendMessage({
         type: 'MARK_SITE', url: location.href, verdict: 'safe',
-      } satisfies Message);
+      } satisfies Message),
+      onReport: () => void chrome.runtime.sendMessage({
+        type: 'MARK_SITE', url: location.href, verdict: 'phishing',
+      } satisfies Message),
+      onExplain: () => void chrome.runtime.sendMessage({
+        type: 'OPEN_REPORT', url: location.href,
+      } satisfies Message),
     });
-  } else if (msg.type === 'HIDE_BANNER') {
-    hideBanner();
+  } else if (msg.type === 'HIDE_COMPANION') {
+    hideCompanion();
   } else if (msg.type === 'RESCAN') {
     // The popup asks for this when the service worker has no verdict for the
     // tab — after a worker restart, or after the extension was reloaded while

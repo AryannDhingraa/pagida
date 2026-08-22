@@ -13,8 +13,10 @@ export interface Settings {
   enabled: boolean;
   /** How aggressively heuristic weights are applied. */
   sensitivity: Sensitivity;
-  /** Show the in-page warning bar on danger-band pages. */
+  /** Let Iris appear on the page itself when something is wrong. */
   showBanner: boolean;
+  /** Gather the full site report. Extra lookups, so it is opt-out. */
+  siteReport: boolean;
   /** Look up domain registration age via RDAP. Sends the domain, never the URL. */
   useRdap: boolean;
   /** Download the OpenPhish community feed daily and check against it locally. */
@@ -28,6 +30,7 @@ export const DEFAULT_SETTINGS: Settings = {
   enabled: true,
   sensitivity: 'balanced',
   showBanner: true,
+  siteReport: true,
   useRdap: true,
   useFeeds: true,
   useSafeBrowsing: false,
