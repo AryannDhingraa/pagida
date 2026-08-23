@@ -14,9 +14,22 @@ thing that ever leaves it is a domain name.
 [![CI](https://github.com/AryannDhingraa/pagida/actions/workflows/ci.yml/badge.svg)](https://github.com/AryannDhingraa/pagida/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Manifest V3](https://img.shields.io/badge/manifest-v3-blue.svg)](src/manifest.json)
-[![Tests](https://img.shields.io/badge/tests-79%20passing-brightgreen.svg)](test)
+[![Tests](https://img.shields.io/badge/tests-87%20passing-brightgreen.svg)](test)
 
 *παγίδα — Greek for "trap".*
+
+**Coming to the Chrome Web Store.** Until then, [grab the latest release](https://github.com/AryannDhingraa/pagida/releases)
+and load it unpacked — [three steps, below](#install).
+
+</div>
+
+---
+
+<div align="center">
+
+<img src="docs/img/demo.gif" width="760" alt="Two identical CommBank login pages side by side; one is marked FAKE, and Pagida scores it 78 with the reasons listed">
+
+<sub><a href="docs/pagida-demo.mp4">Watch with sound (28s)</a></sub>
 
 </div>
 
