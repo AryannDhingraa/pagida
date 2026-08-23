@@ -51,3 +51,39 @@ describe('sameSite', () => {
     expect(sameSite('not a url', 'https://example.com')).toBe(false);
   });
 });
+
+describe('the real Public Suffix List', () => {
+  // Every one of these was parsed wrongly by the hand-written suffix table.
+  // They are the reason the full list now ships.
+  it.each([
+    // suffix, host, expected registrable domain
+    ['uk sub-suffix',        'www.bbc.co.uk',              'bbc.co.uk'],
+    ['jp prefecture',        'foo.city.chiyoda.tokyo.jp',  'city.chiyoda.tokyo.jp'],
+    // `*.ck` makes every label under `ck` a suffix, so `example.ck` is the
+    // suffix and `shop` is what somebody registered.
+    ['wildcard suffix',      'shop.example.ck',            'shop.example.ck'],
+    ['wildcard, deeper',     'a.b.example.ck',             'b.example.ck'],
+    ['brazil nom wildcard',  'x.example.nom.br',           'x.example.nom.br'],
+    ['long generic tld',     'login.example.education',    'example.education'],
+    ['hosting suffix',       'someone.github.io',          'someone.github.io'],
+    ['hosting, with sub',    'docs.someone.github.io',     'someone.github.io'],
+    ['aws regional s3',      'bucket.s3.ap-southeast-2.amazonaws.com', 'bucket.s3.ap-southeast-2.amazonaws.com'],
+    ['australian gov',       'my.services.gov.au',         'services.gov.au'],
+    ['no rule at all',       'thing.invalidtldxyzzy',      'thing.invalidtldxyzzy'],
+  ])('parses %s correctly', (_label, host, expected) => {
+    expect(parseHost(host).registrableDomain).toBe(expected);
+  });
+
+  it('honours the exception rules that punch holes in wildcards', () => {
+    // `!www.ck` is an explicit exception to `*.ck`, so www.ck is itself
+    // registrable rather than being a public suffix.
+    expect(parseHost('www.ck').registrableDomain).toBe('www.ck');
+  });
+
+  it('does not let a subdomain masquerade as the registrable domain', () => {
+    // The whole point. If this returns paypal.com, every brand rule downstream
+    // treats an attacker's site as PayPal's own.
+    expect(parseHost('paypal.com.secure-login.tk').registrableDomain).toBe('secure-login.tk');
+    expect(parseHost('accounts.google.com.evil.co.uk').registrableDomain).toBe('evil.co.uk');
+  });
+});

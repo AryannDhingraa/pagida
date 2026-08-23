@@ -51,8 +51,32 @@
 
 const ALLOWED_ORIGIN_PREFIX = 'chrome-extension://';
 
-/** Per-install daily ceiling, so one abusive client cannot burn the free tier. */
-const DAILY_LIMIT = 250;
+/**
+ * ABUSE CONTROL
+ *
+ * An earlier version of this file rate-limited on the install id alone and
+ * admitted in a comment that anyone could forge the header. That is true, and
+ * it is not a small problem: a forged id is a fresh bucket, so an attacker with
+ * a loop could spend the whole month's Web Risk allowance in an afternoon and
+ * every real user would silently lose the feature.
+ *
+ * Three buckets now, checked in order of how expensive they are to evade:
+ *
+ *   GLOBAL   A hard ceiling on total upstream calls per day. Forgeable
+ *            identifiers cannot get past this one, because it does not depend
+ *            on any identifier at all. It is the actual budget guarantee; the
+ *            other two exist to stop one client eating that budget.
+ *   NETWORK  Per source IP, which Cloudflare supplies and a client cannot set.
+ *            Evading it costs real infrastructure.
+ *   INSTALL  Per install id. Trivially forgeable, kept because it is the one
+ *            that correctly separates several users behind one office NAT.
+ *
+ * Every key is a hash, never the raw value, and every key expires daily. The
+ * server therefore cannot reconstruct who asked about what even if it wanted to.
+ */
+const GLOBAL_DAILY_LIMIT = 60_000;   // of the 100k/month Web Risk allowance
+const NETWORK_DAILY_LIMIT = 2_000;   // generous for a NAT, useless for a script
+const INSTALL_DAILY_LIMIT = 250;
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -68,22 +92,55 @@ function json(body, status = 200) {
   });
 }
 
+/** Short, stable, and irreversible — so no key in KV is a raw identifier. */
+async function hashKey(value) {
+  const bytes = new TextEncoder().encode(`pagida:${value}`);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(digest).slice(0, 8)]
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
 /**
- * A per-install daily counter in KV.
+ * Increment one counter and report whether it is still under its ceiling.
  *
- * The install id is a random UUID the extension makes up for itself. It is not
- * an account and it is not tied to a person — it exists only so that one
- * runaway client cannot spend everyone else's quota. The key expires daily, so
- * nothing accumulates.
+ * Deliberately not atomic. KV is eventually consistent, so two simultaneous
+ * requests can both read the same value and under-count — which means the real
+ * ceiling is fuzzy at the edges. That is the correct trade here: the failure
+ * mode is spending slightly more of a free allowance than intended, and the
+ * alternative (Durable Objects) costs money to avoid a rounding error. If this
+ * ever guards something billable, move it.
  */
-async function withinQuota(env, installId) {
+async function underLimit(env, key, limit, ttlSeconds = 60 * 60 * 26) {
   if (!env.QUOTA) return true; // no KV bound — fail open rather than break
-  const day = new Date().toISOString().slice(0, 10);
-  const key = `q:${day}:${installId}`;
   const used = Number((await env.QUOTA.get(key)) ?? 0);
-  if (used >= DAILY_LIMIT) return false;
-  await env.QUOTA.put(key, String(used + 1), { expirationTtl: 60 * 60 * 26 });
+  if (used >= limit) return false;
+  await env.QUOTA.put(key, String(used + 1), { expirationTtl: ttlSeconds });
   return true;
+}
+
+/**
+ * The three buckets, cheapest to evade last.
+ *
+ * Returns null when the request may proceed, or a short reason when it may not.
+ * The reason is never sent to the client — a rate limiter that tells you which
+ * limit you hit is a rate limiter that tells you how to route around it.
+ */
+async function checkQuota(env, request, installId) {
+  const day = new Date().toISOString().slice(0, 10);
+
+  if (!(await underLimit(env, `g:${day}`, GLOBAL_DAILY_LIMIT))) return 'global';
+
+  const ip = request.headers.get('CF-Connecting-IP') ?? '';
+  if (ip) {
+    const key = `n:${day}:${await hashKey(ip)}`;
+    if (!(await underLimit(env, key, NETWORK_DAILY_LIMIT))) return 'network';
+  }
+
+  const key = `i:${day}:${await hashKey(installId)}`;
+  if (!(await underLimit(env, key, INSTALL_DAILY_LIMIT))) return 'install';
+
+  return null;
 }
 
 /** Only ever accept a bare hostname. Never a path, never a query string. */
@@ -144,8 +201,11 @@ export default {
     if (!looksLikeExtension) return json({ error: 'forbidden' }, 403);
 
     const installId = (request.headers.get('X-Pagida-Install') ?? '').slice(0, 64) || 'anonymous';
-    if (!(await withinQuota(env, installId))) {
-      return json({ error: 'daily-limit' }, 429);
+
+    // Quota is checked before the route, so an unknown path cannot be used as a
+    // free way to probe whether the service is up.
+    if (await checkQuota(env, request, installId)) {
+      return json({ error: 'busy' }, 429);
     }
 
     if (url.pathname === '/v1/webrisk') {

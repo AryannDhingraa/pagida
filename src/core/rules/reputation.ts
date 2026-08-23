@@ -1,6 +1,13 @@
 /**
  * Tier 3 — reputation rules.
  *
+ * Two different kinds of thing live in here and the difference matters. Domain
+ * age is an inference: young domains correlate with phishing, and plenty of
+ * innocent sites are young. A blocklist entry is a report: an organisation
+ * looked at this exact URL and classified it. The latter carry
+ * `certainty: 'confirmed'`, which exempts them from the sensitivity multiplier
+ * and from being suppressed by a user's "mark as safe".
+ *
  * These depend on a network lookup having happened. Each one is optional and
  * each degrades to "no signal" rather than to an error, so the engine keeps
  * working with no keys, no network, and no consent to look anything up.
@@ -68,6 +75,9 @@ export const feedUrlMatch: Rule = (e) => {
     detail: 'This URL appears in the OpenPhish community feed of confirmed phishing pages.',
     tier: 'reputation',
     weight: 80,
+    // Not a judgement Pagida made. Someone looked at this exact thing and
+    // classified it, which is why a user's trust mark cannot silence it.
+    certainty: 'confirmed',
   });
 };
 
@@ -80,6 +90,9 @@ export const feedHostMatch: Rule = (e) => {
     detail: 'Another page on this same host appears in the OpenPhish community feed of confirmed phishing pages.',
     tier: 'reputation',
     weight: 55,
+    // Not a judgement Pagida made. Someone looked at this exact thing and
+    // classified it, which is why a user's trust mark cannot silence it.
+    certainty: 'confirmed',
   });
 };
 
@@ -92,6 +105,9 @@ export const safeBrowsingMatch: Rule = (e) => {
     detail: 'Google classifies this address as social engineering, malware or unwanted software.',
     tier: 'reputation',
     weight: 85,
+    // Not a judgement Pagida made. Someone looked at this exact thing and
+    // classified it, which is why a user's trust mark cannot silence it.
+    certainty: 'confirmed',
   });
 };
 
@@ -114,6 +130,9 @@ export const webRiskMatch: Rule = (e) => {
     detail: `Google has this domain recorded as ${what}. This is not a guess about how the page looks \u2014 it is a positive identification.`,
     tier: 'reputation',
     weight: 80,
+    // Not a judgement Pagida made. Someone looked at this exact thing and
+    // classified it, which is why a user's trust mark cannot silence it.
+    certainty: 'confirmed',
   });
 };
 

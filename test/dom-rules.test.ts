@@ -152,19 +152,111 @@ describe('reputation tier', () => {
 });
 
 describe('user overrides', () => {
-  it('a site the user marked safe scores zero regardless of everything else', () => {
-    const v = evaluate(page('http://paypal-verify.tk/login',
-      { hasPasswordField: true, crossOriginPasswordForm: true },
-      { userTrusted: true, domainAgeDays: 1, feedUrlHit: true }));
+  it('suppresses heuristics on a site the user marked safe', () => {
+    // Every one of these is something Pagida merely inferred. The user has
+    // looked at this site and disagreed, and their call stands.
+    const v = evaluate(page('http://weird-looking-domain.tk/login',
+      { hasPasswordField: true, obfuscationScore: 0.9, pasteBlocked: true },
+      { userTrusted: true }));
     expect(v.score).toBe(0);
     expect(v.band).toBe('clean');
     expect(v.override).toBe('trusted');
+  });
+
+  it('still warns when a trusted site turns up on a confirmed blocklist', () => {
+    // The regression this whole design exists for. A site the user trusted a
+    // year ago and that is on a phishing feed today has almost certainly been
+    // compromised since, and staying silent is the worst available outcome.
+    const v = evaluate(page('https://my-favourite-forum.com/login',
+      { hasPasswordField: true },
+      { userTrusted: true, feedUrlHit: true }));
+    expect(v.band).toBe('danger');
+    expect(v.override).toBe('overruled');
+    expect(v.confidence).toBe('confirmed');
+    expect(v.signals.map((s) => s.id)).toContain('phishing_feed_url_match');
+    expect(v.signals.map((s) => s.id)).toContain('trust_overruled');
+  });
+
+  it('does not let a trust mark survive a Web Risk identification either', () => {
+    const v = evaluate(page('https://trusted-by-me.com/',
+      {}, { userTrusted: true, webRiskHit: true, webRiskThreats: ['SOCIAL_ENGINEERING'] }));
+    expect(v.band).toBe('danger');
+    expect(v.override).toBe('overruled');
+  });
+
+  it('does not treat domain age as confirmed, so a trusted young site stays quiet', () => {
+    // Age is an inference, not an identification. It must not overrule the user.
+    const v = evaluate(page('https://brand-new-thing.com/login',
+      { hasPasswordField: true }, { userTrusted: true, domainAgeDays: 2 }));
+    expect(v.override).toBe('trusted');
+    expect(v.band).toBe('clean');
   });
 
   it('a site the user reported is always danger', () => {
     const v = evaluate(page('https://www.google.com/', {}, { userReported: true, domainAgeDays: 9000 }));
     expect(v.band).toBe('danger');
     expect(v.override).toBe('reported');
+  });
+});
+
+describe('conclusions — reaching danger by shape rather than by sum', () => {
+  it('calls a fake brand sign-in page what it is, without needing 55 points', () => {
+    const v = evaluate(page('https://account-services.com/signin',
+      { hasPasswordField: true, brandTokens: ['paypal'], crossOriginPasswordForm: true }));
+    expect(v.band).toBe('danger');
+    expect(v.conclusions.map((c) => c.id)).toContain('credential_theft');
+    expect(v.confidence).toBe('high');
+    // The warning is read by a person, so the brand is spelled the way the
+    // brand spells it.
+    expect(v.conclusions[0]?.title).toContain('PayPal');
+  });
+
+  it('flags brand impersonation even when the form posts to itself', () => {
+    const v = evaluate(page('https://account-services.com/signin',
+      { hasPasswordField: true, brandTokens: ['microsoft'] }));
+    expect(v.band).toBe('danger');
+    expect(v.conclusions.map((c) => c.id)).toContain('brand_impersonation_login');
+  });
+
+  it('never fires the impersonation conclusion on the brand\u2019s own site', () => {
+    const v = evaluate(page('https://www.paypal.com/signin',
+      { hasPasswordField: true, brandTokens: ['paypal'], title: 'Log in to PayPal' },
+      { domainAgeDays: 9000 }));
+    expect(v.conclusions).toHaveLength(0);
+    expect(v.band).toBe('clean');
+  });
+
+  it('holds a young domain with a plain login form at suspicious, not danger', () => {
+    const v = evaluate(page('https://some-new-startup.com/login',
+      { hasPasswordField: true }, { domainAgeDays: 10 }));
+    expect(v.conclusions.map((c) => c.id)).toContain('fresh_domain_credential_form');
+    expect(v.band).toBe('suspicious');
+  });
+
+  it('reports a password posted off-site even with no brand involved', () => {
+    const v = evaluate(page('https://something.com/login', {
+      hasPasswordField: true,
+      crossOriginPasswordForm: true,
+      passwordFormActions: ['https://collector-node4.tk/x.php'],
+    }));
+    expect(v.conclusions.map((c) => c.id)).toContain('password_posted_offsite');
+    expect(v.conclusions[0]?.detail).toContain('collector-node4.tk');
+    expect(v.band).toBe('danger');
+  });
+
+  it('a confirmed blocklist hit is confirmed confidence, a pile of heuristics is not', () => {
+    const listed = evaluate(page('https://x.com/', {}, { feedUrlHit: true }));
+    expect(listed.confidence).toBe('confirmed');
+
+    const guessy = evaluate(page('https://login-secure-verify-account.some-host.tk/a/b/c/d'));
+    expect(guessy.confidence).not.toBe('confirmed');
+    expect(guessy.confidence).not.toBe('high');
+  });
+
+  it('leaves an ordinary clean page with no conclusions at all', () => {
+    const v = evaluate(page('https://en.wikipedia.org/wiki/Phishing', {}, { domainAgeDays: 8000 }));
+    expect(v.conclusions).toHaveLength(0);
+    expect(v.band).toBe('clean');
   });
 });
 

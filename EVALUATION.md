@@ -4,10 +4,36 @@ Pagida's detection engine is measured, not asserted. This document is the
 methodology; `npm run evaluate` reproduces the numbers against live data, so
 they move as the threat landscape does.
 
-## What is being measured
+## What is being measured, and what is not
 
 **The URL tier only** — 21 rules that work from the address alone, with no page
 content and no network lookups.
+
+> ### Read this before quoting any number below
+>
+> These figures describe **one of four layers**, and it is the weakest one by
+> design. They are not Pagida's detection rate.
+>
+> In particular, the recall column collapses towards zero at the higher
+> thresholds, and that is the expected result rather than a defect: an address
+> on its own usually does not contain enough information to justify interrupting
+> somebody. `evil-new-domain.com/login` looks like nothing, because it *is*
+> nothing until you open it.
+>
+> What actually reaches the top band in real use is the **conclusions layer**
+> (`src/core/conclusions.ts`), which correlates page content, domain age and
+> threat intelligence — none of which this harness can see. A page that scores 8
+> here will be called `danger` in the browser the moment the content script
+> reports a brand sign-in form posting credentials to a third party.
+>
+> **The honest gap:** Pagida does not yet have an end-to-end measurement of the
+> full engine, because that means rendering live phishing pages, and a
+> harness that opens attacker-controlled pages is a liability rather than an
+> asset. The conclusions layer is instead covered by unit tests over
+> hand-specified evidence, which proves the logic and not the hit rate. Closing
+> this gap properly — an isolated browser, an archived corpus, offline replay —
+> is the top item on the roadmap, and until it is done nobody should claim a
+> detection rate for Pagida as a whole.
 
 Two exclusions are deliberate:
 

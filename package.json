@@ -1,6 +1,6 @@
 {
   "name": "pagida",
-  "version": "2.1.1",
+  "version": "3.0.0",
   "description": "Pagida \u2014 explainable, local-first phishing detection for Chrome. Scores every page you visit against 20+ weighted signals and tells you exactly why.",
   "type": "module",
   "private": true,
@@ -23,7 +23,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src scripts test --ext .ts,.mjs",
     "evaluate": "node scripts/run-ts.mjs scripts/evaluate.ts",
-    "build:allowlist": "node scripts/run-ts.mjs scripts/build-allowlist.ts"
+    "build:allowlist": "node scripts/run-ts.mjs scripts/build-allowlist.ts",
+    "build:psl": "node scripts/build-psl.mjs"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.287",
@@ -32,6 +33,7 @@
     "@typescript-eslint/parser": "^8.18.0",
     "esbuild": "^0.24.0",
     "eslint": "^8.57.1",
+    "psl": "^1.15.0",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
   }

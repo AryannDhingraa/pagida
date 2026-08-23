@@ -13,7 +13,7 @@
  *     showing a weaker score as though it were the whole answer.
  */
 import type { Signal, Verdict } from '../core/types.js';
-import { adviceFor, BAND_NAME, headlineFor } from '../core/score.js';
+import { adviceFor, BAND_NAME, CONFIDENCE_NOTE, headlineFor } from '../core/score.js';
 import { Iris, expressionForBand, injectIrisCss } from '../ui/iris.js';
 import type { Message } from '../shared/messages.js';
 
@@ -28,6 +28,7 @@ const el = {
   meter: $('meter'),
   bandName: $('band-name'),
   score: $('score'),
+  confidence: $('confidence'),
   found: $('found'),
   foundCount: $('found-count'),
   signals: $<HTMLUListElement>('signals'),
@@ -66,6 +67,10 @@ function render(verdict: Verdict): void {
   el.meter.style.width = `${Math.max(verdict.score, 4)}%`;
   el.score.textContent = String(verdict.score);
   el.bandName.textContent = BAND_NAME[verdict.band];
+
+  // The number is a sum of weights, not a likelihood. This line is what stops
+  // the popup implying otherwise.
+  el.confidence.textContent = CONFIDENCE_NOTE[verdict.confidence];
 
   const signals = verdict.signals;
   el.signals.replaceChildren();

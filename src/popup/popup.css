@@ -63,6 +63,15 @@ h1 {
   transition: width 900ms var(--ease), background 500ms var(--ease);
 }
 .scale { display: flex; justify-content: space-between; align-items: baseline; padding-top: 7px; }
+/* The honest caption under the number.
+   A weighted sum is not a probability, and showing "34" next to "do not type
+   your password here" borrows an authority the arithmetic has not earned. This
+   line says what the evidence is actually worth. */
+.confidence {
+  margin: 7px 0 0; font-size: 11.5px; line-height: 1.45; color: var(--ink-3);
+}
+.confidence b { font-weight: 700; color: var(--ink-2); }
+
 .scale .num {
   font-size: 15px; font-weight: 700; color: var(--band);
   font-variant-numeric: tabular-nums; transition: color 500ms var(--ease);

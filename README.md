@@ -43,7 +43,7 @@ and load it unpacked — [three steps, below](#install).
 
 ## What it does
 
-Pagida scores the page you are on against **38 rules across four tiers**, then
+Pagida scores the page you are on against **38 rules across three tiers, plus a correlation layer**, then
 shows you the verdict, the score, and every single rule that fired with the
 actual evidence that made it fire.
 
@@ -95,8 +95,34 @@ unpacked**, and select the `dist` folder.
 
 ## How the scoring works
 
-Three tiers. The first two are free, instant and entirely offline. The third
-needs a network lookup and every part of it can be switched off.
+Four layers. The first two are free, instant and entirely offline; the third
+needs a network lookup and every part of it can be switched off; the fourth does
+not add points at all.
+
+### The fourth layer is the one that matters
+
+Adding up weights is fine for ranking suspicion and useless as a claim about the
+world. `62` does not mean "62% likely to be phishing" — it means some rules
+fired and their numbers added up. Pagida's own evaluation shows where that
+breaks: on address evidence alone, almost nothing reaches the top band, because
+no single cosmetic observation deserves to interrupt anybody and raising the
+weights would only trade the false-negative problem for a false-positive one.
+
+So the top band is not reached by arithmetic. **Conclusions**
+([`src/core/conclusions.ts`](src/core/conclusions.ts)) look for the shape of an
+actual attack across independent observations and impose a *floor* on the band:
+
+> A sign-in form carrying a brand's name, on a domain that brand does not own,
+> posting the password to a third site.
+
+Each part of that is unremarkable alone. Together there is no innocent reading,
+and Pagida says so in those words rather than showing you a number. Every
+conclusion has to be a sentence a person would accept as a reason — if it needs
+hedging, it is a heuristic and it belongs in a rule with a weight.
+
+The popup shows the score, and underneath it says what the evidence is actually
+worth: *confirmed* (an outside source identified this), *strong*, *moderate*, or
+*weak — surface details only*.
 
 ### Tier 1 — the address (21 rules, offline)
 
@@ -139,7 +165,7 @@ needs a network lookup and every part of it can be switched off.
 | Page blocks paste or right-click | +10…14 |
 | Hidden or zero-sized frames, obfuscated inline scripts | +9…14 |
 
-### Tier 3 — reputation (5 rules, network)
+### Tier 3 — reputation (6 rules, network)
 
 | Signal | Weight | Sends |
 |---|---:|---|
@@ -212,22 +238,26 @@ from.
 
 ## Marking sites yourself
 
-Your judgement beats the score. Two buttons in the popup, and two items in the
-right-click menu on any link:
+What you say beats what Pagida thinks — with exactly one exception, and the
+exception is the point.
 
-- **Report as phishing** — the site is forced to the top band from then on, and
-  Pagida offers to open PhishTank so you can contribute it upstream. Nothing is
-  submitted automatically.
-- **Mark as safe** — scoring is switched off for that host entirely.
-- **Right-click any link → Check this link with Pagida** — scores a link
-  *without opening it*.
+Marking a site **safe** switches off everything Pagida merely *inferred* about
+it. No lookalike rules, no domain-age warning, no page heuristics. You have
+looked at the site and disagreed, and arguing with you is how a security tool
+gets uninstalled.
 
-Everything you mark is listed in Options, removable one by one, and exportable
-as JSON.
+It does **not** switch off confirmed threat intelligence. If a site you trusted
+last year turns up on a phishing blocklist or in Google's threat data today,
+Pagida warns you anyway and tells you plainly that it is overriding your own
+mark. That case is almost always a legitimate site that has been compromised
+since — which is precisely the scenario the tool exists for, and staying quiet
+through it would be the worst thing it could do.
 
-<div align="center">
-<img src="docs/img/report.png" width="720" alt="The Pagida site report, showing the risk verdict, every signal that fired, and where each fact came from">
-</div>
+Marking a site as **phishing** warns you about it from then on, and offers to
+forward it to PhishTank. Nothing is submitted unless you click.
+
+Everything you have marked is listed in Options, removable one by one, and
+exportable as JSON.
 
 ## Permissions, and why each one is needed
 
@@ -291,10 +321,21 @@ blind spots is worse than one that has them.
   of live phishing runs on hacked legitimate sites and free hosting, where the
   URL genuinely looks fine. The page-content tier is what catches those, and it
   only runs on pages you actually open.
-- **Public-suffix parsing is approximate.** Pagida ships a compact suffix list
-  plus a country-code heuristic rather than the full 230KB Public Suffix List.
-  Exotic suffixes can be mis-parsed, which weakens brand comparison — it never
-  invents a verdict on its own.
+- **The engine has no measured end-to-end detection rate.** `npm run evaluate`
+  measures the address tier, which is the weakest layer by design; the
+  conclusions layer that actually reaches the top band is covered by unit tests,
+  which proves the logic and not the hit rate. Measuring it properly means
+  replaying real phishing pages, and that harness does not exist yet. Until it
+  does, no number in this repository should be read as Pagida's detection rate.
+- **Only the top-level document is inspected.** `all_frames` is off, so a page
+  that hides its login form inside an iframe is not seen by the page tier. This
+  is a real gap and not a hard one to exploit; it is off because running the
+  content script in every frame on every page is a meaningful performance and
+  attack-surface cost, and that trade will be revisited.
+- **Page rules only see what is there when they look.** A page that renders its
+  phishing form after a click, or only for visitors it likes, can be past the
+  content script before the form exists. The mutation observer catches most of
+  it and cannot catch all of it.
 - **The brand list is finite.** ~100 brands, weighted towards what Australian
   users actually get targeted with. A brand that is not on the list gets no
   impersonation detection.
@@ -307,10 +348,12 @@ blind spots is worse than one that has them.
 
 ## Roadmap
 
+- [ ] **Measure the whole engine, not just the URL tier** — an archived page
+      corpus replayed offline, so the conclusions layer has a real hit rate
+      instead of only unit tests
 - [ ] Chrome Web Store listing
 - [ ] Miner and skimmer detection — the one thing Netcraft does that Pagida does not
 - [ ] Firefox build — the code is MV3, the manifest needs a variant
-- [ ] Full Public Suffix List, compiled down at build time
 - [ ] Web Risk **Update API** — hash prefixes matched locally, so not even the
       domain leaves the machine
 - [ ] A second opinion tier: optional VirusTotal and urlscan.io enrichment,
