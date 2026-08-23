@@ -274,7 +274,7 @@ shipped engine rather than a reimplementation of it.
 ```bash
 npm install
 npm run dev          # rebuild on change — load dist/ as an unpacked extension
-npm test             # 79 unit tests
+npm test             # 87 unit tests
 npm run typecheck
 npm run lint
 npm run evaluate     # fetch today's feeds and re-measure
@@ -307,21 +307,37 @@ blind spots is worse than one that has them.
 
 ## Roadmap
 
-- [ ] Chrome Web Store listing (submitted, in review)
+- [ ] Chrome Web Store listing
 - [ ] Miner and skimmer detection — the one thing Netcraft does that Pagida does not
 - [ ] Firefox build — the code is MV3, the manifest needs a variant
 - [ ] Full Public Suffix List, compiled down at build time
-- [ ] A second opinion tier: optional VirusTotal and urlscan.io enrichment
+- [ ] Web Risk **Update API** — hash prefixes matched locally, so not even the
+      domain leaves the machine
+- [ ] A second opinion tier: optional VirusTotal and urlscan.io enrichment,
+      user-keyed, because their terms do not allow proxying
 - [ ] An offline-trained model as a fourth tier, with per-feature attributions
       so the explanation survives
 
 ## A note on the licence terms of the data sources
 
-Pagida is free and open source, and it stays that way for a concrete reason:
-**Google Safe Browsing is free for non-commercial use only**, and the VirusTotal
-public API forbids commercial products outright. Charging for Pagida would mean
-migrating to Google Web Risk and VirusTotal Premium — both paid. That trade-off
-is documented here rather than discovered later.
+Free tiers come with terms, and those terms shaped the architecture rather than
+the other way round.
+
+**Google Safe Browsing is free for non-commercial use only.** Pagida offers the
+threat-list check to everyone through a proxy it runs, and offering a service to
+other people counts as commercial even when nobody is charged. So the proxy uses
+**Google Web Risk** instead, whose free tier explicitly permits commercial use —
+100,000 lookups a month. Safe Browsing is still available for anyone who supplies
+their own key and wants the check done page-by-page, which is a personal,
+non-commercial use and stays inside its terms.
+
+**The VirusTotal public API forbids commercial products outright**, which is why
+the VirusTotal tier on the roadmap below is marked optional and user-keyed: it
+can never be something Pagida provides on someone's behalf.
+
+Every other source — RDAP, Cloudflare DNS, crt.sh, Shodan InternetDB, ipwho.is,
+the Wayback Machine, URLhaus and OpenPhish — is free and keyless with no such
+restriction.
 
 ## Contributing
 

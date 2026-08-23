@@ -2,8 +2,8 @@
 
 ## Supported versions
 
-The latest released version is the only supported one. Pagida is a single-file
-extension with no server component; upgrading means installing the current
+The latest released version is the only supported one. Pagida is an extension
+plus one small stateless proxy; upgrading means installing the current
 release.
 
 ## Reporting a vulnerability
