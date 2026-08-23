@@ -5,6 +5,12 @@ dist/
 .env
 .env.local
 eval-results.json
+# Working notes: the store listing draft, the launch plan, the LinkedIn copy.
+# These are notes to myself about launching the project, not documentation of
+# how the software works, and a stranger reading the repo should get the second
+# thing. Kept locally, never pushed.
+notes/
+
 # never commit evidence, feeds or captured pages
 evidence/
 samples/private/
