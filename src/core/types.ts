@@ -57,6 +57,10 @@ export interface PageEvidence {
   feedHostHit?: boolean;
   /** Google Safe Browsing returned a threat match. */
   safeBrowsingHit?: boolean;
+  /** Google Web Risk, reached through the Pagida service. */
+  webRiskHit?: boolean;
+  /** What Web Risk called it: MALWARE, SOCIAL_ENGINEERING, UNWANTED_SOFTWARE. */
+  webRiskThreats?: string[];
 
   // --- user tier ---
   /** The user explicitly reported this host as phishing. */
@@ -81,6 +85,8 @@ export interface DomEvidence {
   brandTokens: string[];
   /** Favicon is served from a different registrable domain than the page. */
   externalFavicon: boolean;
+  /** Where the favicon actually came from, so the rule can judge whose it is. */
+  faviconHost?: string;
   /** Page blocks paste on a password field via an inline handler. */
   pasteBlocked: boolean;
   /** Page blocks the right-click menu via an inline handler. */

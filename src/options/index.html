@@ -77,9 +77,15 @@
       </label>
 
       <label class="row toggle">
+        <input type="checkbox" id="usePagidaService">
+        <span class="txt"><b>Check against Google&rsquo;s threat list</b>
+          <em>Google keeps a list of sites caught spreading scams and malware. Checking it normally needs a paid key, so Pagida holds one for you and asks on your behalf &mdash; free, no sign-up. Only the <b>domain name</b> is sent (&ldquo;example.com&rdquo;), never the address of the page you are on, and nothing is stored. Turn it off and everything else keeps working.</em></span>
+      </label>
+
+      <label class="row toggle">
         <input type="checkbox" id="useSafeBrowsing">
-        <span class="txt"><b>Also ask Google Safe Browsing</b>
-          <em>Off unless you turn it on, because this is the one that sends the <b>whole address</b> of every page to Google. Needs a free key of your own.</em></span>
+        <span class="txt"><b>Use my own Safe Browsing key (advanced)</b>
+          <em>For people who want the check done page-by-page rather than domain-by-domain. Off unless you turn it on, because this one sends the <b>whole address</b> of every page straight to Google. Needs a free key of your own.</em></span>
       </label>
 
       <div class="row">

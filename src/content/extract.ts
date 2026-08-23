@@ -102,18 +102,21 @@ function detectBrandTokens(): string[] {
   return BRAND_TOKENS.filter((t) => t.length >= 4 && haystack.includes(t)).slice(0, 5);
 }
 
-/** Favicon served from somewhere other than this site. */
-function hasExternalFavicon(): boolean {
+/** Where the favicon comes from, and whether that is somewhere else. */
+function faviconOrigin(): { external: boolean; host?: string } {
   const link = document.querySelector<HTMLLinkElement>(
     'link[rel~="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]',
   );
   const href = link?.getAttribute('href');
-  if (!href) return false;
+  if (!href) return { external: false };
   const abs = absoluteUrl(href);
-  if (!abs) return false;
+  if (!abs) return { external: false };
   try {
-    return parseHost(new URL(abs).hostname).registrableDomain !== pageDomain();
-  } catch { return false; }
+    const host = new URL(abs).hostname.toLowerCase();
+    return { external: parseHost(host).registrableDomain !== pageDomain(), host };
+  } catch {
+    return { external: false };
+  }
 }
 
 /** How much of the inline script looks deliberately encoded. */
@@ -154,12 +157,14 @@ function contextMenuBlocked(): boolean {
 export function extractDomEvidence(): DomEvidence {
   const forms = analysePasswordForms();
   const nav = navigationHealth();
+  const favicon = faviconOrigin();
   return {
     title: document.title.slice(0, 200),
     ...forms,
     hiddenIframeCount: countHiddenIframes(),
     brandTokens: detectBrandTokens(),
-    externalFavicon: hasExternalFavicon(),
+    externalFavicon: favicon.external,
+    faviconHost: favicon.host,
     contextMenuBlocked: contextMenuBlocked(),
     obfuscationScore: obfuscationScore(),
     ...nav,

@@ -12,6 +12,7 @@ import { parseHost } from '../core/util/domain.js';
 import { domainAgeDays } from '../services/rdap.js';
 import { fetchFeed, loadFeed, normaliseUrl, saveFeed } from '../services/feeds.js';
 import { safeBrowsingLookup } from '../services/safebrowsing.js';
+import { lookupReputation } from '../services/pagidaApi.js';
 import { buildReport, type TechFacts } from '../services/report.js';
 import { animateIcon, setIconBand } from './icon.js';
 import {
@@ -125,6 +126,15 @@ async function score(url: string, dom?: DomEvidence): Promise<Verdict | null> {
     if (settings.useRdap) {
       const age = await domainAgeDays(base.hostname);
       if (age !== undefined) evidence.domainAgeDays = age;
+    }
+    // The Pagida service — sends the domain only, and gives every user the
+    // key-gated threat list without asking them to register for anything.
+    if (settings.usePagidaService) {
+      const rep = await lookupReputation(base.hostname);
+      if (rep) {
+        evidence.webRiskHit = rep.listed;
+        evidence.webRiskThreats = rep.threatTypes;
+      }
     }
     // Safe Browsing — sends the full URL, so it is opt-in with the user's key.
     if (settings.useSafeBrowsing && settings.safeBrowsingKey) {

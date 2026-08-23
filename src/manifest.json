@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Pagida \u2014 Phishing Detector",
-  "version": "1.0.0",
+  "version": "2.1.1",
   "description": "Iris checks every page for scams and shows you exactly what she found, in plain English. Runs locally. No tracking.",
   "author": "Aryan Dhingra",
   "homepage_url": "https://github.com/AryannDhingraa/pagida",

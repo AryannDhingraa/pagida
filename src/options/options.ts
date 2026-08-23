@@ -32,6 +32,7 @@ const controls = {
   siteReport: $<HTMLInputElement>('siteReport'),
   useRdap: $<HTMLInputElement>('useRdap'),
   useFeeds: $<HTMLInputElement>('useFeeds'),
+  usePagidaService: $<HTMLInputElement>('usePagidaService'),
   useSafeBrowsing: $<HTMLInputElement>('useSafeBrowsing'),
   safeBrowsingKey: $<HTMLInputElement>('safeBrowsingKey'),
 };
@@ -165,12 +166,13 @@ async function loadSettings(): Promise<void> {
   controls.siteReport.checked = s.siteReport;
   controls.useRdap.checked = s.useRdap;
   controls.useFeeds.checked = s.useFeeds;
+  controls.usePagidaService.checked = s.usePagidaService;
   controls.useSafeBrowsing.checked = s.useSafeBrowsing;
   controls.safeBrowsingKey.value = s.safeBrowsingKey;
 }
 
 function wire(): void {
-  const bind = (input: HTMLInputElement, key: 'enabled' | 'showBanner' | 'siteReport' | 'useRdap' | 'useFeeds' | 'useSafeBrowsing') => {
+  const bind = (input: HTMLInputElement, key: 'enabled' | 'showBanner' | 'siteReport' | 'useRdap' | 'useFeeds' | 'usePagidaService' | 'useSafeBrowsing') => {
     input.addEventListener('change', () => {
       void setSettings({ [key]: input.checked });
       if (key === 'enabled') {
@@ -184,6 +186,7 @@ function wire(): void {
   bind(controls.siteReport, 'siteReport');
   bind(controls.useRdap, 'useRdap');
   bind(controls.useFeeds, 'useFeeds');
+  bind(controls.usePagidaService, 'usePagidaService');
   bind(controls.useSafeBrowsing, 'useSafeBrowsing');
 
   controls.sensitivity.addEventListener('change', () => {

@@ -12,6 +12,7 @@ const emptyDom: DomEvidence = {
   hiddenIframeCount: 0,
   brandTokens: [],
   externalFavicon: false,
+  faviconHost: undefined,
   pasteBlocked: false,
   contextMenuBlocked: false,
   obfuscationScore: 0,
@@ -41,6 +42,39 @@ describe('DOM tier', () => {
     const s = evaluate(e).signals.find((x) => x.id === 'cross_origin_password_form');
     expect(s).toBeDefined();
     expect(s!.detail).toContain('collector.tk');
+  });
+
+  it('does not flag a well-known site for loading its icon from a CDN', () => {
+    // google.com serving its favicon from gstatic.com is not a hotlink, and an
+    // earlier version scored Google as suspicious for exactly this.
+    expect(ids(page('https://aistudio.google.com/prompts/1LPZXruWzGRT5Rz3qpLVzhx30xU22jQNi',
+      { externalFavicon: true, faviconHost: 'www.gstatic.com' })))
+      .not.toContain('hotlinked_brand_favicon');
+  });
+
+  it('does not flag a token in the path of a well-known site', () => {
+    expect(ids(page('https://aistudio.google.com/prompts/1LPZXruWzGRT5Rz3qpLVzhx30xU22jQNi')))
+      .not.toContain('generated_path_segment');
+  });
+
+  it('scores a well-known site clean when nothing behavioural is wrong', () => {
+    const v = evaluate(page('https://aistudio.google.com/prompts/1LPZXruWzGRT5Rz3qpLVzhx30xU22jQNi',
+      { externalFavicon: true, faviconHost: 'www.gstatic.com', hiddenIframeCount: 2, obfuscationScore: 0.8 }));
+    expect(v.band, `fired: ${v.signals.map((s) => s.id).join(', ')}`).toBe('clean');
+  });
+
+  it('still flags a hotlinked brand icon on a site nobody knows', () => {
+    expect(ids(page('https://account-verify-portal.tk/login',
+      { externalFavicon: true, faviconHost: 'www.paypal.com', hasPasswordField: true })))
+      .toContain('hotlinked_brand_favicon');
+  });
+
+  it('still scores a compromised well-known site on behaviour', () => {
+    // The allowlist must never protect a site that is posting your password
+    // somewhere else.
+    expect(ids(page('https://aistudio.google.com/login',
+      { hasPasswordField: true, crossOriginPasswordForm: true, passwordFormActions: ['https://evil.tk/x'] })))
+      .toContain('cross_origin_password_form');
   });
 
   it('flags brand content served from the wrong domain', () => {
@@ -186,5 +220,36 @@ describe('band names line up with the stylesheet', () => {
     expect(ruleFor('caution')).toContain('var(--notice)');
     expect(ruleFor('suspicious')).toContain('var(--caution)');
     expect(ruleFor('danger')).toContain('var(--danger)');
+  });
+});
+
+describe('the Pagida service reputation signal', () => {
+  it('scores a Web Risk listing as danger even on an otherwise plain URL', () => {
+    const verdict = evaluate({
+      ...evidenceFromUrl('https://ordinary-looking-site.com/login')!,
+      webRiskHit: true,
+      webRiskThreats: ['SOCIAL_ENGINEERING'],
+    });
+    expect(verdict.band).toBe('danger');
+    expect(verdict.signals.map((s) => s.id)).toContain('web_risk_match');
+  });
+
+  it('says what Google actually called it, rather than a generic warning', () => {
+    const verdict = evaluate({
+      ...evidenceFromUrl('https://ordinary-looking-site.com/')!,
+      webRiskHit: true,
+      webRiskThreats: ['MALWARE'],
+    });
+    const signal = verdict.signals.find((s) => s.id === 'web_risk_match');
+    expect(signal?.detail).toContain('malware');
+  });
+
+  it('stays silent when the lookup came back clean', () => {
+    const verdict = evaluate({
+      ...evidenceFromUrl('https://ordinary-looking-site.com/')!,
+      webRiskHit: false,
+      webRiskThreats: [],
+    });
+    expect(verdict.signals.map((s) => s.id)).not.toContain('web_risk_match');
   });
 });

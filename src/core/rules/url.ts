@@ -225,8 +225,8 @@ export const highAbuseTld: Rule = (e) => {
 
 /** Unusually deep subdomain nesting, used to push the real domain off-screen on mobile. */
 export const deepSubdomains: Rule = (e) => {
-  const { subdomains, isIpLiteral } = parseHost(e.hostname);
-  if (isIpLiteral || subdomains.length < 4) return null;
+  const { subdomains, registrableDomain, isIpLiteral } = parseHost(e.hostname);
+  if (isIpLiteral || isTrustedName(registrableDomain) || subdomains.length < 4) return null;
   return sig({
     id: 'deep_subdomain_nesting',
     title: 'Unusually long hostname',
@@ -297,6 +297,7 @@ export const riskyDownloadPath: Rule = (e) => {
 
 /** Very long URLs are used to bury the real host and to carry tracking payloads. */
 export const excessiveUrlLength: Rule = (e) => {
+  if (isTrustedName(parseHost(e.hostname).registrableDomain)) return null;
   if (e.url.length < 150) return null;
   return sig({
     id: 'excessive_url_length',
@@ -400,6 +401,12 @@ export const generatedDomainLabel: Rule = (e) => {
  * selectively. Legitimate sites use readable slugs.
  */
 export const generatedPathSegment: Rule = (e) => {
+  // Every real single-page app puts opaque ids in the path — a Google AI Studio
+  // prompt, a Notion page, a Figma file. On a domain that is demonstrably real
+  // this signal carries no information at all, and firing it there is how a
+  // phishing detector loses the user's trust.
+  if (isTrustedName(parseHost(e.hostname).registrableDomain)) return null;
+
   const segments = e.path.split('/').filter(Boolean);
   for (const raw of segments) {
     const seg = raw.toLowerCase();
@@ -434,6 +441,7 @@ export const generatedPathSegment: Rule = (e) => {
  * plaintext addresses in a query string.
  */
 export const emailInUrl: Rule = (e) => {
+  if (isTrustedName(parseHost(e.hostname).registrableDomain)) return null;
   const haystack = decodeURIComponent(e.query + e.path);
   const match = haystack.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/);
   if (!match) return null;

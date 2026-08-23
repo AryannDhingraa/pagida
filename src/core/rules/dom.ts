@@ -7,7 +7,17 @@
  */
 import type { Rule, Signal } from '../types.js';
 import { parseHost } from '../util/domain.js';
-import { BRAND_DOMAINS, domainsForToken } from '../data/index.js';
+import { BRAND_DOMAINS, domainsForToken, isWellKnown } from '../data/index.js';
+
+/**
+ * Cosmetic and structural heuristics are suppressed on domains that are
+ * demonstrably real; rules about what a page *does* with your credentials never
+ * are. A well-known site that has been compromised and is posting passwords to
+ * a third party still scores exactly as it should.
+ */
+function isTrustedName(registrableDomain: string): boolean {
+  return BRAND_DOMAINS.has(registrableDomain) || isWellKnown(registrableDomain);
+}
 
 const sig = (s: Signal): Signal => s;
 
@@ -73,15 +83,31 @@ export const brandContentMismatch: Rule = (e) => {
   return null;
 };
 
-/** Favicon pulled from a different site — usually hotlinked from the real brand. */
+/**
+ * A favicon hotlinked from a brand the page does not belong to.
+ *
+ * The first version of this fired on *any* cross-domain favicon, which is how
+ * essentially every large site serves one — Google loads its icon from gstatic,
+ * and the rule flagged Google. It now only fires on the actual attack: a site
+ * that is not itself well known, serving a brand's own icon from the brand's
+ * own domain, which is what happens when someone copies a login page wholesale.
+ */
 export const externalFavicon: Rule = (e) => {
-  if (!e.dom?.externalFavicon) return null;
+  const d = e.dom;
+  if (!d?.externalFavicon || !d.faviconHost) return null;
+
+  const { registrableDomain } = parseHost(e.hostname);
+  if (isTrustedName(registrableDomain)) return null;
+
+  const faviconDomain = parseHost(d.faviconHost).registrableDomain;
+  if (!BRAND_DOMAINS.has(faviconDomain)) return null;
+
   return sig({
-    id: 'external_favicon',
-    title: 'Tab icon is borrowed from another site',
-    detail: 'The little icon in the browser tab is loaded from a different domain, which usually means it was copied from the site being impersonated.',
+    id: 'hotlinked_brand_favicon',
+    title: 'Tab icon is taken straight from another company',
+    detail: `The icon in the browser tab is being loaded from ${faviconDomain}, which has nothing to do with ${registrableDomain}. Copied login pages usually copy the icon too.`,
     tier: 'dom',
-    weight: 14,
+    weight: 18,
   });
 };
 
@@ -89,6 +115,7 @@ export const externalFavicon: Rule = (e) => {
 export const antiAnalysisBehaviour: Rule = (e) => {
   const d = e.dom;
   if (!d) return null;
+  if (isTrustedName(parseHost(e.hostname).registrableDomain)) return null;
   const reasons: string[] = [];
   if (d.pasteBlocked) reasons.push('blocks pasting into the password box');
   if (d.contextMenuBlocked) reasons.push('blocks the right-click menu');
@@ -104,6 +131,7 @@ export const antiAnalysisBehaviour: Rule = (e) => {
 
 /** Hidden iframes — overlay and clickjacking technique. */
 export const hiddenIframes: Rule = (e) => {
+  if (isTrustedName(parseHost(e.hostname).registrableDomain)) return null;
   const n = e.dom?.hiddenIframeCount ?? 0;
   if (n < 1) return null;
   return sig({
@@ -117,6 +145,9 @@ export const hiddenIframes: Rule = (e) => {
 
 /** Obfuscated inline JavaScript. */
 export const obfuscatedScripts: Rule = (e) => {
+  // Minified and bundled JavaScript on a real site trips every marker this
+  // looks for. On a site nobody has heard of it still means something.
+  if (isTrustedName(parseHost(e.hostname).registrableDomain)) return null;
   const score = e.dom?.obfuscationScore ?? 0;
   if (score < 0.35) return null;
   return sig({

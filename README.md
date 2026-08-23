@@ -8,7 +8,8 @@
 
 Iris checks every page you open and tells you, in a sentence, whether to trust
 it — then shows you every single reason behind that answer. No machine-learning
-black box, no account, no server, nothing sent anywhere by default.
+black box, no account, no tracking. Scoring happens on your machine; the only
+thing that ever leaves it is a domain name.
 
 [![CI](https://github.com/AryannDhingraa/pagida/actions/workflows/ci.yml/badge.svg)](https://github.com/AryannDhingraa/pagida/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
@@ -29,7 +30,7 @@ black box, no account, no server, nothing sent anywhere by default.
 
 ## What it does
 
-Pagida scores the page you are on against **37 rules across three tiers**, then
+Pagida scores the page you are on against **38 rules across four tiers**, then
 shows you the verdict, the score, and every single rule that fired with the
 actual evidence that made it fire.
 
@@ -171,19 +172,27 @@ what the numbers do *not* mean.
 
 ## Privacy
 
-Pagida makes exactly two network requests, both optional, both switchable off in
-Options, and neither of them carries a page you visited:
+In normal use Pagida makes three network requests, all optional, all switchable
+off in Options, and **none of them carries a page you visited**:
 
-1. **`rdap.org`** — the registrable domain only (`example.com`), to find out how
-   old it is. Never the path, never the query string. Cached for seven days.
-2. **`raw.githubusercontent.com`** — downloads the OpenPhish public blocklist
+1. **The Pagida service** — a bare domain name (`example.com`), to check
+   Google's list of sites caught spreading scams and malware. That list needs a
+   paid key, so Pagida holds one and asks on your behalf, free and with no
+   sign-up. The server refuses any request containing a path, and stores
+   nothing — no IP, no history, no logs. Its source is in `proxy/worker.js`.
+2. **`rdap.org`** — the registrable domain only, to find out how old it is.
+   Never the path, never the query string. Cached for seven days.
+3. **`raw.githubusercontent.com`** — downloads the OpenPhish public blocklist
    once every 12 hours. The matching then happens on your machine.
 
-Google Safe Browsing is a third option and it is **off by default**, because it
-is the one lookup that would send the full address of every page you open to a
-third party. If you want it, you supply your own key.
+Opening a site report adds six more domain-level lookups, listed in
+[PRIVACY.md](PRIVACY.md), and only while the report is open.
 
-There is no analytics, no account, no server, no `chrome.storage.sync`, and no
+Using **your own** Safe Browsing key is a fourth option and it is **off by
+default**, because it is the one lookup that sends the full address of every
+page you open to a third party.
+
+There is no analytics, no account, no `chrome.storage.sync`, and no
 telemetry of any kind. [PRIVACY.md](PRIVACY.md) is the long version;
 [THREAT-MODEL.md](THREAT-MODEL.md) covers what Pagida can and cannot protect you
 from.

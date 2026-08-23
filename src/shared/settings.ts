@@ -21,6 +21,14 @@ export interface Settings {
   useRdap: boolean;
   /** Download the OpenPhish community feed daily and check against it locally. */
   useFeeds: boolean;
+  /**
+   * Ask the Pagida service whether a domain is on Google's threat lists.
+   *
+   * Sends a bare domain name — never the address of the page. On by default,
+   * because the people this protects are the ones who will never find a
+   * settings screen; one switch here turns it off for good.
+   */
+  usePagidaService: boolean;
   /** Google Safe Browsing lookups. Off unless the user supplies their own key. */
   useSafeBrowsing: boolean;
   safeBrowsingKey: string;
@@ -33,6 +41,7 @@ export const DEFAULT_SETTINGS: Settings = {
   siteReport: true,
   useRdap: true,
   useFeeds: true,
+  usePagidaService: true,
   useSafeBrowsing: false,
   safeBrowsingKey: '',
 };

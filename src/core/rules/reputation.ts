@@ -95,10 +95,39 @@ export const safeBrowsingMatch: Rule = (e) => {
   });
 };
 
+/**
+ * Google Web Risk, via the Pagida service.
+ *
+ * Weighted just under Safe Browsing's own rule for the plain reason that this
+ * lookup is domain-level: Web Risk was asked about the site, not the exact
+ * page. That is still a very strong signal — Google does not list a domain on
+ * a hunch — but a compromised subpage of a large host is the case where a
+ * URL-level answer would be sharper.
+ */
+export const webRiskMatch: Rule = (e) => {
+  if (!e.webRiskHit) return null;
+  const kinds = (e.webRiskThreats ?? []).map((t) => THREAT_WORDS[t] ?? t.toLowerCase()).filter(Boolean);
+  const what = kinds.length ? kinds.join(' and ') : 'a known threat';
+  return sig({
+    id: 'web_risk_match',
+    title: 'On Google\u2019s list of dangerous sites',
+    detail: `Google has this domain recorded as ${what}. This is not a guess about how the page looks \u2014 it is a positive identification.`,
+    tier: 'reputation',
+    weight: 80,
+  });
+};
+
+const THREAT_WORDS: Record<string, string> = {
+  MALWARE: 'a site that installs malware',
+  SOCIAL_ENGINEERING: 'a phishing or scam site',
+  UNWANTED_SOFTWARE: 'a site that pushes unwanted software',
+};
+
 export const REPUTATION_RULES: Rule[] = [
   newlyRegisteredDomain,
   establishedDomain,
   feedUrlMatch,
   feedHostMatch,
   safeBrowsingMatch,
+  webRiskMatch,
 ];
