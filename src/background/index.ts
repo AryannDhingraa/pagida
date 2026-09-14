@@ -238,13 +238,21 @@ chrome.runtime.onMessage.addListener((msg: Message, sender, sendResponse) => {
         }
 
         case 'BUILD_REPORT': {
-          // The verdict comes first so the report can lead with it, and so a
-          // slow lookup never delays the part the user actually asked about.
-          const verdict = await score(msg.url);
+          // Reuse the verdict the popup is already showing for this exact URL.
+          // Scoring again here would drop the page-tier signals, because those
+          // come from the content script and cannot be recovered from the
+          // address alone, and the report would then contradict the popup.
           let tech: TechFacts | undefined;
+          let verdict: Verdict | null = null;
           for (const [id, url] of urlCache) {
-            if (url === msg.url) { tech = techCache.get(id); break; }
+            if (url !== msg.url) continue;
+            tech = techCache.get(id);
+            verdict = verdictCache.get(id) ?? null;
+            break;
           }
+          // No open tab for this address: a right-click link check, or a report
+          // opened after the tab closed. Address tier is all there is.
+          if (!verdict) verdict = await score(msg.url);
           const report = await buildReport(msg.url, verdict ?? undefined, tech);
           if (!report) return sendResponse({ ok: false, error: 'not-analysable' });
           return sendResponse({ ok: true, report });

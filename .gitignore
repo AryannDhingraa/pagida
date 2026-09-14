@@ -14,3 +14,4 @@ notes/
 # never commit evidence, feeds or captured pages
 evidence/
 samples/private/
+docs/store/

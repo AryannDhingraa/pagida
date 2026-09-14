@@ -35,7 +35,15 @@ const controls = {
   usePagidaService: $<HTMLInputElement>('usePagidaService'),
   useSafeBrowsing: $<HTMLInputElement>('useSafeBrowsing'),
   safeBrowsingKey: $<HTMLInputElement>('safeBrowsingKey'),
+  sbKeyRow: $<HTMLElement>('sbKeyRow'),
 };
+
+// The key box belongs to the advanced toggle above it. Left on screen while
+// that toggle is off it reads as something the user has to fill in, which is
+// the opposite of true: the threat list works for everyone with no key at all.
+function syncKeyRow(): void {
+  controls.sbKeyRow.hidden = !controls.useSafeBrowsing.checked;
+}
 
 let headerIris: Iris | undefined;
 let tagAlong: TagAlong | undefined;
@@ -169,6 +177,7 @@ async function loadSettings(): Promise<void> {
   controls.usePagidaService.checked = s.usePagidaService;
   controls.useSafeBrowsing.checked = s.useSafeBrowsing;
   controls.safeBrowsingKey.value = s.safeBrowsingKey;
+  syncKeyRow();
 }
 
 function wire(): void {
@@ -188,6 +197,7 @@ function wire(): void {
   bind(controls.useFeeds, 'useFeeds');
   bind(controls.usePagidaService, 'usePagidaService');
   bind(controls.useSafeBrowsing, 'useSafeBrowsing');
+  controls.useSafeBrowsing.addEventListener('change', syncKeyRow);
 
   controls.sensitivity.addEventListener('change', () => {
     void setSettings({ sensitivity: controls.sensitivity.value as Sensitivity });
