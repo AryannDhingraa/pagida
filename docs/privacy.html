@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy &mdash; Pagida</title>
+<meta name="description" content="Pagida's privacy policy. No account, no analytics, no telemetry. What leaves your computer, source by source.">
+<link rel="icon" href="img/icon.png">
+<style>
+  :root{--bg:#fbfbfd;--fg:#191a24;--mute:#54566e;--line:#e2e2ec;--brand:#5b4fe0;--wash:#f2f0fe}
+  @media (prefers-color-scheme:dark){:root{--bg:#101118;--fg:#ecedf5;--mute:#9c9fb8;--line:#2a2d3d;--brand:#9294ff;--wash:#21224a}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font:400 16px/1.65 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:760px;margin:0 auto;padding-inline:20px;padding-block:56px 96px}
+  h1{font-size:34px;line-height:1.15;letter-spacing:-.02em;margin:0 0 6px}
+  h2{font-size:21px;margin:44px 0 10px;letter-spacing:-.01em}
+  h3{font-size:17px;margin:28px 0 8px}
+  p{margin:0 0 14px}
+  ul{margin:0 0 16px;padding-left:22px} li{margin:5px 0}
+  a{color:var(--brand)}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.88em;
+    background:var(--wash);padding:1px 5px;border-radius:4px}
+  .tw{overflow-x:auto;margin:0 0 20px;border:1px solid var(--line);border-radius:10px}
+  table{border-collapse:collapse;width:100%;font-size:14.5px;min-width:420px}
+  th{text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.07em;
+    color:var(--mute);font-weight:600;padding:10px 14px;border-bottom:1px solid var(--line)}
+  td{padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  footer{margin-top:52px;padding-top:18px;border-top:1px solid var(--line);color:var(--mute);font-size:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Privacy Policy</h1>
+<p><strong>Pagida — Phishing Detector</strong> Last updated: 23 August 2026 (version 2.1.1)</p>
+<h2>The short version</h2>
+<p>Pagida has no account, no analytics, no telemetry, no advertising, and sells nothing. Scoring happens on your computer.</p>
+<p>There is now <strong>one</strong> server involved, and this policy will not bury it: Pagida runs a small proxy so that everyone gets the key-gated threat list for free without registering for anything. It receives <strong>a domain name</strong> — <code>example.com</code> — and never the address of the page you are on. It stores nothing. It is a single switch on the options page, and turning it off costs you one signal out of twenty-two, not the product.</p>
+<p>Everything below is the long version, source by source.</p>
+<h2>What Pagida stores, and where</h2>
+<p>Everything is stored in <code>chrome.storage.local</code> — on this computer, in this browser profile, and nowhere else.</p>
+<div class="tw"><table><thead><tr><th>Stored</th><th>What it is</th></tr></thead><tbody>
+<tr><td>Settings</td><td>Your toggles, sensitivity, and (if you added one) your own Safe Browsing API key</td></tr>
+<tr><td>Marked sites</td><td>Hostnames you explicitly reported as phishing or marked as safe</td></tr>
+<tr><td>Install id</td><td>A random string this browser generates for itself, used only as a quota counter for the service below. Not an account, not linked to you, never sent anywhere else</td></tr>
+<tr><td>Domain-age cache</td><td>Registrable domains and their registration age, kept for 7 days</td></tr>
+<tr><td>Blocklist</td><td>A copy of the public OpenPhish feed, refreshed every 12 hours</td></tr>
+<tr><td>Counters</td><td>Three numbers: pages checked, warnings raised, sites you reported</td></tr>
+</tbody></table></div>
+<p>Pagida deliberately does <strong>not</strong> use <code>chrome.storage.sync</code>. Sync would push browsing-derived data through your Google account, and a tool built to protect your browsing should not quietly move it somewhere else.</p>
+<p>Uninstalling the extension deletes all of it.</p>
+<h2>What leaves your computer</h2>
+<h3>1. The Pagida service — domain only (on by default)</h3>
+<p>Google publishes a list of sites caught spreading scams and malware. Reading it requires a paid API key, which is exactly the kind of obstacle that means a feature never reaches the people who need it most. So Pagida holds the key on a Cloudflare Worker and asks on your behalf.</p>
+<p>What is sent: <strong>the bare domain name and nothing else.</strong> The server rejects any request containing a path or a query string, so a bug in the extension cannot leak a URL here even by accident.</p>
+<p>What is stored on the server: <strong>nothing.</strong> No IP address, no install id, no query history, no logs, no analytics. The install id travels in a header purely so a single runaway client cannot exhaust the shared daily allowance; it is discarded once the counter is incremented, and the counter itself expires daily.</p>
+<p>The proxy source is in the repository at <code>proxy/worker.js</code> — you can read exactly what it does.</p>
+<p>Why it is on by default: a protection nobody finds in a settings screen protects nobody. That is a judgement call, made in the open, and reversible in one click: Options → What I look up → <em>Check against Google&#x27;s threat list</em>.</p>
+<h3>2. Domain-age lookups — <code>rdap.org</code> and the domain registries (on by default)</h3>
+<p>Pagida sends <strong>the registrable domain only</strong> — <code>example.com</code> — to find out when it was registered. Newly created domains are the single strongest free signal in phishing detection. <code>rdap.org</code> redirects to the registry that actually holds the record, so the request may end at Verisign, Nominet, or another registry.</p>
+<ul><li>The path, query string, fragment and subdomains are <strong>never</strong> sent.</li><li>Results are cached locally for seven days.</li><li>Requests time out after four seconds and failure is silent.</li><li>Switch it off: Options → What I look up → <em>Check how old a domain is</em>.</li></ul>
+<h3>3. Blocklist download — <code>raw.githubusercontent.com</code> (on by default)</h3>
+<p>Pagida downloads the <a href="https://github.com/openphish/public_feed">OpenPhish community feed</a> every 12 hours. This is a plain file download of a public list. The matching then happens entirely on your machine — <strong>the pages you visit are never sent</strong>.</p>
+<p>Switch it off: Options → What I look up → <em>The community scam list</em>.</p>
+<h3>4. The site report — only when you open one</h3>
+<p>Opening a site report makes further lookups, and only then. Every one of them receives a domain name or an IP address. None receives the page you were on.</p>
+<div class="tw"><table><thead><tr><th>Source</th><th>Receives</th><th>Returns</th></tr></thead><tbody>
+<tr><td><code>cloudflare-dns.com</code></td><td>the hostname and domain</td><td>addresses, mail and name records</td></tr>
+<tr><td><code>crt.sh</code></td><td>the domain</td><td>its public certificate history</td></tr>
+<tr><td><code>internetdb.shodan.io</code></td><td>the IP address the domain resolves to</td><td>what Shodan already knows about that machine from its own scanning. Pagida never scans anything itself</td></tr>
+<tr><td><code>ipwho.is</code></td><td>the IP address</td><td>which network and country the address belongs to</td></tr>
+<tr><td><code>archive.org</code></td><td>the domain</td><td>when the site was first archived</td></tr>
+<tr><td><code>urlhaus-api.abuse.ch</code></td><td>the hostname</td><td>whether it is recorded as distributing malware</td></tr>
+</tbody></table></div>
+<p>All of these run only when you press the button, never in the background, and the whole feature can be switched off: Options → What I look up → <em>Full site reports</em>.</p>
+<h3>5. Your own Safe Browsing key — off by default</h3>
+<p>This is the only feature that sends the <strong>full address</strong> of pages you open to a third party, which is why it is off, and why it requires you to supply your own Google API key rather than using Pagida&#x27;s. It exists for people who want the check done page-by-page rather than domain-by-domain. If you enable it, the complete URL of each page you visit is sent to Google, subject to <a href="https://policies.google.com/privacy">Google&#x27;s privacy policy</a>.</p>
+<p>Switch it on: Options → What I look up → <em>Use my own Safe Browsing key</em>.</p>
+<h3>6. PhishTank — only when you click</h3>
+<p>If you report a site as phishing, Pagida asks whether you also want to submit it to PhishTank. Saying yes opens PhishTank in a new tab with the URL filled in. Nothing is submitted automatically, and saying no keeps the report local.</p>
+<h2>What the content script reads</h2>
+<p>Pagida runs a content script on <code>http</code> and <code>https</code> pages. It reads the page structure and sends a <strong>fixed-shape summary</strong> to the extension&#x27;s own service worker — inside your browser, never over the network.</p>
+<p>The summary contains only: whether a password field exists, where login forms submit to, how many hidden frames there are, which brand names appear in the title or headings, where the tab icon is loaded from, whether paste or right-click is blocked, a single obfuscation score, link and form counts, and — for the report — the page&#x27;s declared generator, framework hints, and the list of third-party hosts it loads scripts from.</p>
+<p>It does <strong>not</strong> contain page text, form values, passwords, cookies, session tokens, or anything you type.</p>
+<h2>Why Pagida asks for access to all sites</h2>
+<p>The extension requests <code>http://<em>/</em></code> and <code>https://<em>/</em></code>. A phishing detector that only ran on a list of sites would be useless, because the whole point is the site you have never seen before. The permission is used to read page structure as described above and to reach the lookup services listed above. It is not used to read your history, your tab list, or the contents of pages.</p>
+<h2>What Pagida never does</h2>
+<ul><li>No analytics, crash reporting, or usage statistics</li><li>No advertising, and no data sold, rented or shared with anyone</li><li>No user accounts, no sign-in, no email address, no identifiers tied to you</li><li>No selling or transferring data to third parties for any purpose</li><li>No creditworthiness, lending, or other unrelated use of any data</li><li>No remote code: everything that runs is in the package you installed, and the</li></ul>
+<p>content security policy blocks remote scripts</p>
+<h2>Children</h2>
+<p>Pagida is not directed at children and collects nothing from anyone, including children under 13.</p>
+<h2>Changes</h2>
+<p>Material changes to this policy will be recorded in the repository&#x27;s commit history and noted in the release notes for the version they ship in.</p>
+<h2>Contact</h2>
+<p>Open an issue at &lt;<a href="https://github.com/AryannDhingraa/pagida/issues&gt;,">https://github.com/AryannDhingraa/pagida/issues&gt;,</a> or see <a href="SECURITY.md">SECURITY.md</a> for security-specific reports.</p>
+<footer>Pagida is free and open source under the MIT licence.
+<a href="https://github.com/AryannDhingraa/pagida">Source on GitHub</a>.</footer>
+</div>
+</body>
+</html>
