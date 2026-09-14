@@ -25,7 +25,7 @@
  */
 
 /** The deployed Worker. Overridden at build time via PAGIDA_API_BASE. */
-export const API_BASE = 'https://api.pagida.workers.dev';
+export const API_BASE = 'https://pagida-proxy.aryandhingra.workers.dev';
 
 const TIMEOUT_MS = 4500;
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
