@@ -167,7 +167,18 @@ async function webRisk(env, domain) {
   const res = await fetch(`https://webrisk.googleapis.com/v1/uris:search?${params}`, {
     cf: { cacheTtl: 900, cacheEverything: true },
   });
-  if (!res.ok) return { error: `upstream-${res.status}` };
+  if (!res.ok) {
+    // Surface Google's own reason. Its error bodies name the problem (an
+    // invalid key, a disabled API) and never echo the key itself, so this is
+    // safe to return and is the difference between a five-minute fix and an
+    // afternoon of guessing.
+    let detail = '';
+    try {
+      const body = await res.json();
+      detail = body?.error?.message ?? body?.error?.status ?? '';
+    } catch { /* not JSON */ }
+    return { error: `upstream-${res.status}`, detail: String(detail).slice(0, 220) };
+  }
 
   const data = await res.json();
   const threat = data?.threat;

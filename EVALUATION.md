@@ -1,5 +1,11 @@
 # Evaluation
 
+**Last reproduced: 16 September 2026, against that day's OpenPhish feed
+(300 confirmed phishing URLs, 2,000 top-site negatives, 40 hand-built real
+brand login URLs). Engine: v3.0.1.** Rerun it yourself with `npm run evaluate`;
+the numbers move with the feed, and the ones below are one day's sample, not a
+constant.
+
 Pagida's detection engine is measured, not asserted. This document is the
 methodology; `npm run evaluate` reproduces the numbers against live data, so
 they move as the threat landscape does.
@@ -81,9 +87,9 @@ phishing detector normally falls apart, and they are the number worth quoting.
 
 | Band | Threshold | Precision | Recall | F1 | False positives |
 |---|---:|---:|---:|---:|---:|
-| `WORTH_A_LOOK` | ≥15 | 94.5% | 62.7% | 75.4% | 11 / 2,040 |
-| `SUSPICIOUS` | ≥30 | 97.8% | 30.3% | 46.3% | 2 / 2,040 |
-| `LIKELY_PHISHING` | ≥55 | 100% | 2.3% | 4.6% | 0 / 2,040 |
+| `WORTH_A_LOOK` | ≥15 | 94.6% | 58.7% | 72.4% | 10 / 2,040 |
+| `SUSPICIOUS` | ≥30 | 96.4% | 18.0% | 30.3% | 2 / 2,040 |
+| `LIKELY_PHISHING` | ≥55 | 100% | 0.3% | 0.7% | 0 / 2,040 |
 
 **Hard negatives: 0 false positives out of 40.**
 
@@ -91,16 +97,16 @@ phishing detector normally falls apart, and they are the number worth quoting.
 
 Not by picking round numbers, and not by maximising F1.
 
-Maximum F1 in the sweep sits at threshold 5 (82.2%), and shipping there would be
+Maximum F1 in the sweep sits at threshold 5 (83.3%), and shipping there would be
 a mistake: it flags 51 of 2,040 legitimate sites. A phishing warning that fires
 on one site in forty is a warning people learn to click through, and a tool
 people click through is worse than no tool at all.
 
 So the bands are chosen by **what each one costs the user**:
 
-- **≥15 shows a small badge.** A badge is cheap, so it can afford 62.7% recall
+- **≥15 shows a small badge.** A badge is cheap, so it can afford 58.7% recall
   at a 0.5% false-positive rate. This is where most real detection happens.
-- **≥30 escalates the badge.** Nearly 98% precision — when this fires, it is
+- **≥30 escalates the badge.** Over 96% precision — when this fires, it is
   almost always right.
 - **≥55 interrupts the page with a warning bar.** Interrupting is expensive, so
   this band is set where the URL tier alone effectively cannot reach it. In
@@ -109,7 +115,7 @@ So the bands are chosen by **what each one costs the user**:
 
 ## What these numbers do not mean
 
-- **Recall is not detection rate.** 30% recall at the shipping threshold is
+- **Recall is not detection rate.** 18% recall at the shipping threshold is
   measured *without* page content and *without* the blocklist, which are the two
   things that catch the phishing the address tier misses. Real-world detection
   with all three tiers active is higher; it is also much harder to measure
@@ -162,16 +168,16 @@ allowlist        1982 domains (ranks 1-2000) — disjoint from the negatives abo
 threshold sweep (all negatives)
   thr | precision | recall  |   F1    | FP | FN
   ----+-----------+---------+---------+----+----
-    5 |     82.8% |   81.7% |   82.2% | 51 | 55
-   10 |     82.1% |   75.0% |   78.4% | 49 | 75
-   15 |     94.5% |   62.7% |   75.4% | 11 | 112
-   20 |     94.2% |   53.7% |   68.4% | 10 | 139
-   25 |     98.4% |   41.3% |   58.2% |  2 | 176
-   30*|     97.8% |   30.3% |   46.3% |  2 | 209
-   35 |    100.0% |   22.0% |   36.1% |  0 | 234
-   40 |    100.0% |   13.0% |   23.0% |  0 | 261
-   45 |    100.0% |    8.7% |   16.0% |  0 | 274
-   50 |    100.0% |    2.3% |    4.6% |  0 | 293
+    5 |     83.6% |   83.0% |   83.3% | 49 | 51
+   10 |     83.4% |   78.7% |   81.0% | 47 | 64
+   15 |     94.6% |   58.7% |   72.4% | 10 |124
+   20 |     93.5% |   48.0% |   63.4% | 10 |156
+   25 |     98.3% |   38.0% |   54.8% |  2 |186
+   30*|     96.4% |   18.0% |   30.3% |  2 |246
+   35 |    100.0% |   13.7% |   24.0% |  0 |259
+   40 |    100.0% |    6.7% |   12.5% |  0 |280
+   45 |    100.0% |    4.7% |    8.9% |  0 |286
+   50 |    100.0% |    2.0% |    3.9% |  0 |294
    55 |    100.0% |    2.3% |    4.6% |  0 | 293
    60 |    100.0% |    0.7% |    1.3% |  0 | 298
    65 |    100.0% |    0.7% |    1.3% |  0 | 298
