@@ -177,7 +177,10 @@ async function webRisk(env, domain) {
       const body = await res.json();
       detail = body?.error?.message ?? body?.error?.status ?? '';
     } catch { /* not JSON */ }
-    return { error: `upstream-${res.status}`, detail: String(detail).slice(0, 220) };
+    // Belt and braces: Google does not echo the key in its errors, but this
+    // response is public and a security tool should not rely on that.
+    const safe = String(detail).replace(/AIza[0-9A-Za-z_-]{10,}/g, '[key]');
+    return { error: `upstream-${res.status}`, detail: safe.slice(0, 220) };
   }
 
   const data = await res.json();
