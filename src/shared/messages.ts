@@ -33,7 +33,9 @@ export type Message =
   /** Popup -> content script: report your signals again, right now. */
   | { type: 'RESCAN' }
   /** Webmail content script -> worker: check this open email. */
-  | { type: 'EMAIL_SIGNALS'; email: EmailEvidence; imageUrls: string[] };
+  | { type: 'EMAIL_SIGNALS'; email: EmailEvidence; imageUrls: string[] }
+  /** Popup -> worker: how is email checking going on this webmail tab? */
+  | { type: 'GET_MAIL_STATUS'; tabId: number };
 
 export type Response =
   | { ok: true; verdict: Verdict }

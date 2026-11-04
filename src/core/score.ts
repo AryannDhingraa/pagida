@@ -169,7 +169,7 @@ export function evaluate(e: PageEvidence, opts: EvaluateOptions = {}): Verdict {
         {
           id: 'trust_overruled',
           title: 'You marked this site safe, and I am warning you anyway',
-          detail: 'You trusted this site before, so Pagida has been staying quiet about it. It is now on a list of confirmed attacks — which usually means it has been compromised since. This is the one thing your mark does not silence.',
+          detail: 'You trusted this site before, so Pagida has been staying quiet about it. It is now on a list of confirmed attacks, which usually means it has been compromised since. This is the one thing your mark does not silence.',
           tier: 'user',
           weight: 0,
         },

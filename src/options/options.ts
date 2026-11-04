@@ -101,7 +101,7 @@ function buildOnboarding(): void {
 
   const steps: Step[] = [
     {
-      title: 'Hello — I am Iris',
+      title: 'Hello, I am Iris',
       render: () => {
         const meet = document.createElement('div');
         meet.className = 'meet';
@@ -137,10 +137,10 @@ function buildOnboarding(): void {
         const wrap = document.createElement('div');
         wrap.append(para('Almost nothing, and you decide. The pages you visit are never sent anywhere.'));
         wrap.append(toggleRow('useRdap', 'How old a website is',
-          'Sends just the domain name — never the full address, never the page.'));
+          'Sends just the domain name, never the full address, never the page.'));
         wrap.append(toggleRow('useFeeds', 'The community scam list',
           'Downloads a public list twice a day, then checks against it here on your machine.'));
-        wrap.append(para('Google Safe Browsing is available too, but it is off until you turn it on — it is the one that would send full addresses to Google.'));
+        wrap.append(para('Google Safe Browsing is available too, but it is off until you turn it on, because it is the one that would send full addresses to Google.'));
         return wrap;
       },
     },
@@ -149,7 +149,7 @@ function buildOnboarding(): void {
       render: () => stepBody(
         'If I get something wrong, tell me. Mark a site as safe and I stop scoring it. Report one and I will warn you every time.',
         'Right-click any link and choose <b>Ask Iris about this link</b> and I will check it without opening it.',
-        'And if you ever want the whole story on a site — who registered it, where it is hosted, whether it can even send email — open the full site report from my popup.',
+        'And if you ever want the whole story on a site (who registered it, where it is hosted, whether it can even send email), open the full site report from my popup.',
       ),
     },
   ];
@@ -216,7 +216,7 @@ async function renderFeed(): Promise<void> {
   const count = (feedUrls ?? []).length;
   $('feed-status').textContent = count
     ? `${count.toLocaleString()} known scam pages · updated ${ago(feedUpdatedAt ?? 0)}`
-    : 'not loaded yet — press Update now';
+    : 'not loaded yet. Press Update now';
 }
 
 function markRow(mark: UserMark): HTMLLIElement {
@@ -264,7 +264,7 @@ $('refresh-feed').addEventListener('click', () => void (async () => {
   btn.disabled = false;
   btn.textContent = 'Update now';
   if (!res?.ok) {
-    $('feed-status').textContent = 'could not reach the list — try again in a bit';
+    $('feed-status').textContent = 'could not reach the list. Try again in a bit';
     headerIris?.setExpression('sad');
   } else {
     await renderFeed();

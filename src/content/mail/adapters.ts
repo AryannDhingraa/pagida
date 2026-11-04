@@ -54,10 +54,20 @@ export function readGmail(): OpenMessage[] {
   const subject = text(document.querySelector('h2.hP'));
   // The signed-in account is in the tab title: "Inbox (3) - jose@monkey.org - Gmail".
   const account = (document.title.match(EMAIL_RE) ?? [''])[0];
-  // Each expanded message in a conversation is a div.adn with its own sender and body.
-  for (const msg of Array.from(document.querySelectorAll<HTMLElement>('div.adn'))) {
+  // Each expanded message in a conversation is a div.adn with its own sender
+  // and body. If Gmail ever drops that class, fall back to the message block
+  // around each body (it carries data-message-id).
+  let messages = Array.from(document.querySelectorAll<HTMLElement>('div.adn'));
+  if (messages.length === 0) {
+    messages = Array.from(document.querySelectorAll<HTMLElement>('div.a3s'))
+      .map((b) => b.closest<HTMLElement>('[data-message-id], [data-legacy-message-id]'))
+      .filter((m): m is HTMLElement => !!m);
+  }
+  for (const msg of messages) {
     const body = msg.querySelector<HTMLElement>('div.a3s');
-    const from = msg.querySelector<HTMLElement>('span.gD[email], span[email].gD');
+    // The sender carries email= and name=; recipients ("to me") sit in span.g2.
+    const from = msg.querySelector<HTMLElement>('span.gD[email]')
+      ?? Array.from(msg.querySelectorAll<HTMLElement>('[email][name]')).find((el) => !el.classList.contains('g2') && !body?.contains(el)) ?? null;
     if (!body || !from) continue;
     const attachments = [
       ...Array.from(msg.querySelectorAll('span.aV3')).map((s) => text(s)),

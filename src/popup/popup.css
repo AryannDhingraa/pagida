@@ -145,3 +145,11 @@ footer {
   width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.5; fill: none;
   stroke-linecap: round; stroke-linejoin: round;
 }
+
+/* --- webmail tabs: what email checking has done here --- */
+.mail { margin: 4px 18px 12px; padding: 10px 12px; border-radius: 12px;
+  background: color-mix(in srgb, var(--brand) 7%, var(--surface)); border: 1px solid var(--line); }
+.mail .label { margin: 0 0 3px; }
+.mail p { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--ink-2); }
+.mail p.last { margin-top: 5px; font-weight: 600; color: var(--danger); }
+.mail p.last[data-band="suspicious"] { color: var(--caution); }

@@ -95,7 +95,7 @@ async function paintBadge(tabId: number, verdict: Verdict, animate = false): Pro
   await chrome.action.setBadgeText({ tabId, text: BADGE_TEXT[verdict.band] });
   await chrome.action.setTitle({
     tabId,
-    title: `Pagida — ${BAND_NAME[verdict.band]}, ${verdict.score}/100. ${summarise(verdict)}`,
+    title: `Pagida: ${BAND_NAME[verdict.band]}, ${verdict.score}/100. ${summarise(verdict)}`,
   });
 
   // The icon is drawn rather than loaded, so it can react. A short bounce and
@@ -209,15 +209,16 @@ async function score(url: string, dom?: DomEvidence): Promise<Verdict | null> {
  * local blocklists, then the email rules, then (online, when it can still
  * matter) domain ages and Google's threat lists for the unknown domains.
  */
+/** What the popup shows on a webmail tab: how many emails were checked there, and the last warning. */
+interface MailStatus { checked: number; warned: number; last?: { band: string; title: string; from: string } }
+const mailStatus = new Map<number, MailStatus>();
+
 const hostOf = (href: string): string => { try { return new URL(href).hostname.toLowerCase(); } catch { return ''; } };
 
 async function scoreEmail(email: EmailEvidence, imageUrls: string[]) {
   const settings = await getSettings();
-  const qrUrls: string[] = [];
-  for (const img of imageUrls.slice(0, 3)) {
-    const data = await decodeQr(img);
-    if (data && /^https?:\/\//i.test(data)) qrUrls.push(data);
-  }
+  const decoded = await Promise.all(imageUrls.slice(0, 3).map((img) => decodeQr(img)));
+  const qrUrls = decoded.filter((d): d is string => !!d && /^https?:\/\//i.test(d));
   const targets = [...new Set([...email.links.map((l) => l.href), ...qrUrls])].slice(0, 40);
   const feed = settings.useFeeds ? await loadFeed() : null;
   const index = settings.useFeeds ? await getIndex() : null;
@@ -245,26 +246,31 @@ async function scoreEmail(email: EmailEvidence, imageUrls: string[]) {
       .slice(0, 3);
     let changed = false;
     const domainAges: Record<string, number | null> = {};
-    if (settings.useRdap) {
+    // Both lookups run side by side, so an email waits for the slowest answer
+    // (each times out after a few seconds), not for the sum of them all.
+    const ages = async (): Promise<void> => {
+      if (!settings.useRdap) return;
       const sender = senderDomain(email.fromAddress);
       const domains = [...new Set([sender, ...unknownHosts.map((h) => parseHost(h).registrableDomain)])]
         .filter((d) => d && !FREE_MAIL.has(d) && !BRAND_DOMAINS.has(d) && !isWellKnown(d)).slice(0, 4);
-      for (const d of domains) {
+      await Promise.all(domains.map(async (d) => {
         const age = await domainAgeDays(d);
         if (age !== undefined) { domainAges[d] = age; changed = true; }
-      }
-    }
-    if (settings.usePagidaService) {
-      for (const host of unknownHosts) {
-        if (await rememberedClean(host)) { void bumpLookupStat('remembered'); continue; }
+      }));
+    };
+    const lists = async (): Promise<void> => {
+      if (!settings.usePagidaService) return;
+      await Promise.all(unknownHosts.map(async (host) => {
+        if (await rememberedClean(host)) { void bumpLookupStat('remembered'); return; }
         const rep = await lookupReputation(host);
         void bumpLookupStat('asked');
-        if (!rep) continue;
-        if (!rep.listed) { await rememberClean(host); continue; }
+        if (!rep) return;
+        if (!rep.listed) { await rememberClean(host); return; }
         for (const f of findings) if (hostOf(f.href) === host) f.listed = true;
         changed = true;
-      }
-    }
+      }));
+    };
+    await Promise.all([ages(), lists()]);
     if (changed) verdict = evaluateEmail({ ...email, qrUrls, domainAges }, findings);
   }
 
@@ -416,7 +422,22 @@ chrome.runtime.onMessage.addListener((msg: Message, sender, sendResponse) => {
           const settings = await getSettings();
           if (!settings.enabled || !settings.checkEmail) return sendResponse({ ok: false, error: 'off' });
           const { verdict, findings } = await scoreEmail(msg.email, msg.imageUrls);
+          const tabId = sender.tab?.id;
+          if (tabId !== undefined) {
+            const st = mailStatus.get(tabId) ?? { checked: 0, warned: 0 };
+            st.checked++;
+            if (verdict.conclusions[0]) {
+              st.warned++;
+              st.last = { band: verdict.band, title: verdict.conclusions[0].title, from: msg.email.fromAddress };
+            }
+            mailStatus.set(tabId, st);
+          }
           return sendResponse({ ok: true, verdict, findings });
+        }
+
+        case 'GET_MAIL_STATUS': {
+          const settings = await getSettings();
+          return sendResponse({ ok: true, mail: { on: settings.enabled && settings.checkEmail, ...(mailStatus.get(msg.tabId) ?? { checked: 0, warned: 0 }) } });
         }
 
         case 'RESCAN':
@@ -495,11 +516,28 @@ chrome.runtime.onInstalled.addListener((details) => {
     chrome.alarms.create(FEED_ALARM, { periodInMinutes: 60 * 12, delayInMinutes: 60 * 12 });
     void ensureFeed(true);
 
+    void injectIntoOpenTabs();
     if (details.reason === 'install') {
       void chrome.tabs.create({ url: chrome.runtime.getURL('options.html?welcome=1') });
     }
   })();
 });
+
+/**
+ * Chrome only runs content scripts on pages loaded after the extension was
+ * installed or updated. Without this, a Gmail tab that was already open stays
+ * unchecked until it is reloaded, which looks exactly like email checking not
+ * working at all.
+ */
+async function injectIntoOpenTabs(): Promise<void> {
+  const WEBMAIL = /^https:\/\/(?:mail\.google\.com|outlook\.(?:live|office|office365)\.com)\//;
+  const tabs = await chrome.tabs.query({ url: ['http://*/*', 'https://*/*'] }).catch(() => []);
+  for (const tab of tabs) {
+    if (tab.id === undefined || !tab.url || tab.discarded) continue;
+    const files = WEBMAIL.test(tab.url) ? ['content.js', 'mail.js'] : ['content.js'];
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files }).catch(() => undefined);
+  }
+}
 
 chrome.runtime.onStartup.addListener(() => {
   installMenus();
@@ -513,6 +551,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   verdictCache.delete(tabId);
+  mailStatus.delete(tabId);
   techCache.delete(tabId);
   urlCache.delete(tabId);
 });

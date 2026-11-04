@@ -58,8 +58,8 @@ export async function lookupHost(ip: string): Promise<HostFacts | undefined> {
 
 /** Ports that have no business being open on something serving a login page. */
 export const ALARMING_PORTS: Record<number, string> = {
-  21: 'FTP — unencrypted file transfer',
-  23: 'Telnet — unencrypted remote login',
+  21: 'FTP: unencrypted file transfer',
+  23: 'Telnet: unencrypted remote login',
   445: 'Windows file sharing, exposed to the internet',
   1433: 'Microsoft SQL Server, exposed to the internet',
   3306: 'MySQL, exposed to the internet',

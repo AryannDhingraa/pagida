@@ -8,7 +8,7 @@
  * from the model. Nothing is stored, and nothing leaves the computer.
  */
 import { readOpenMessages, type OpenMessage } from './adapters.js';
-import { clearBanner, guardLinks, showBanner } from './banner.js';
+import { guardLinks, showBanner, showChecked } from './banner.js';
 import { score } from '../../learned/textModel.js';
 import { EMAIL_MODEL } from '../../learned/data/emailModel.js';
 import { unwrapLink } from '../../email/links.js';
@@ -35,9 +35,17 @@ async function check(m: OpenMessage): Promise<void> {
     const res = await chrome.runtime.sendMessage({
       type: 'EMAIL_SIGNALS', email: { ...e, textModelScore }, imageUrls: m.imageUrls,
     } satisfies Message) as { ok: boolean; verdict?: EmailVerdict } | undefined;
-    if (!res?.ok || !res.verdict) return;
-    if (res.verdict.conclusions.length > 0) showBanner(m.anchor, res.verdict);
-    else clearBanner(m.anchor);
+    if (!res?.ok || !res.verdict) {
+      // eslint-disable-next-line no-console -- the one way to tell "off" from "broken" when debugging
+      if (res && !res.ok) console.info('[Pagida] email checking is off in Pagida settings');
+      return;
+    }
+    const v = res.verdict;
+    // Band and reason ids only: never the email's content, even in the console.
+    // eslint-disable-next-line no-console -- band and reason ids only, never content
+    console.info(`[Pagida] email checked: ${v.band}${v.conclusions.length ? ` (${v.conclusions.map((c) => c.id).join(', ')})` : ''}`);
+    if (v.conclusions.length > 0) showBanner(m.anchor, v);
+    else showChecked(m.anchor, v);
     guardLinks(m.body, res.verdict.riskyLinks, unwrapLink);
   } catch {
     // Extension reloading, or the worker asleep: the next mutation retries.
@@ -58,3 +66,5 @@ function schedule(): void {
 // navigation, so watch for changes and re-read at most once every 700 ms.
 new MutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
 schedule();
+// eslint-disable-next-line no-console -- confirms the script loaded on this webmail
+console.info(`[Pagida] email checking ready on ${location.hostname}`);

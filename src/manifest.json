@@ -69,7 +69,7 @@
     "storage",
     "contextMenus",
     "alarms",
-    "activeTab"
+    "activeTab", "scripting"
   ],
   "host_permissions": [
     "http://*/*",

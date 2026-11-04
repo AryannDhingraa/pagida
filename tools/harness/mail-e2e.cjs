@@ -54,9 +54,10 @@ const cases = [
       guard = asked && p.url() === before ? `link held: "${asked.split('\n')[0]}"` : `LINK NOT HELD (dialog=${!!asked})`;
       if (!asked) failures++;
     }
-    const ok = c.expect ? card?.band === c.expect : card === null;
+    // A real email gets the quiet "checked" line and no reasons.
+    const ok = c.expect ? card?.band === c.expect : !!card && card.conclusions === '' && ['clean', 'caution'].includes(card.band);
     if (!ok) failures++;
-    console.log(ok ? 'PASS' : 'FAIL', c.url.replace('https://', '').padEnd(40), card ? `${card.band} [${card.conclusions}]` : 'no card', guard ? '\n     ' + guard : '');
+    console.log(ok ? 'PASS' : 'FAIL', c.url.replace('https://', '').padEnd(40), card ? (card.conclusions ? `${card.band} [${card.conclusions}]` : `${card.band}, quiet "checked" line`) : 'nothing shown', guard ? '\n     ' + guard : '');
     await p.close();
   }
   // QR decoding in the worker, on a real image fetched over the network.

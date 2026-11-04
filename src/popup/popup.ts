@@ -13,7 +13,7 @@
  *     showing a weaker score as though it were the whole answer.
  */
 import type { Signal, Verdict } from '../core/types.js';
-import { adviceFor, BAND_NAME, CONFIDENCE_NOTE, headlineFor } from '../core/score.js';
+import { adviceFor, BAND_NAME, CONFIDENCE_NOTE, headlineFor } from '../core/wording.js';
 import { Iris, expressionForBand, injectIrisCss } from '../ui/iris.js';
 import type { Message } from '../shared/messages.js';
 
@@ -69,8 +69,12 @@ function render(verdict: Verdict): void {
   el.bandName.textContent = BAND_NAME[verdict.band];
 
   // The number is a sum of weights, not a likelihood. This line is what stops
-  // the popup implying otherwise.
-  el.confidence.textContent = CONFIDENCE_NOTE[verdict.confidence];
+  // the popup implying otherwise. On a clean page it says so plainly: "Worth a
+  // look rather than an alarm" under "Nothing found" contradicted itself.
+  const positives = verdict.signals.filter((s) => s.weight > 0).length;
+  el.confidence.textContent = verdict.band === 'clean'
+    ? (positives === 0 ? 'No warning signs.' : 'Only small things, none of them a sign of a scam.')
+    : CONFIDENCE_NOTE[verdict.confidence];
 
   const signals = verdict.signals;
   el.signals.replaceChildren();
@@ -85,7 +89,7 @@ function render(verdict: Verdict): void {
   } else {
     el.empty.hidden = !verdict.urlOnly;
     if (verdict.urlOnly) {
-      el.emptyText.textContent = 'I could only check the address here — reload the page for the full check.';
+      el.emptyText.textContent = 'I could only check the address here. Reload the page for the full check.';
       el.emptyText.classList.add('warn');
     }
     el.found.hidden = false;
@@ -169,13 +173,26 @@ function describeAge(days: number): string {
   return `${Math.floor(days / 365)} years old`;
 }
 
+const FACT_IDS = ['f-age', 'f-where', 'f-tls', 'f-lists'];
+
 async function loadQuickFacts(url: string): Promise<void> {
   $('facts').hidden = false;
+  // The connection is known straight away; no reason to make it wait.
+  const https = url.startsWith('https:');
+  setFact('f-tls', https ? 'Encrypted' : 'Not encrypted', https ? 'good' : 'bad');
+  // The full report asks seven public sources. If one is slow, the tile says
+  // so instead of sitting on "checking…" for as long as the popup is open.
+  const timer = setTimeout(() => {
+    for (const id of FACT_IDS) {
+      if ($(id).parentElement?.classList.contains('loading')) setFact(id, 'No answer yet', 'unknown');
+    }
+  }, 8000);
   const res = await chrome.runtime.sendMessage({ type: 'BUILD_REPORT', url } satisfies Message)
     .catch(() => null);
+  clearTimeout(timer);
 
   if (!res?.ok || !res.report) {
-    for (const id of ['f-age', 'f-where', 'f-tls', 'f-lists']) setFact(id, 'Unknown', 'unknown');
+    for (const id of FACT_IDS) if (id !== 'f-tls') setFact(id, 'Unknown', 'unknown');
     return;
   }
   const r = res.report;
@@ -191,15 +208,40 @@ async function loadQuickFacts(url: string): Promise<void> {
     : undefined;
   setFact('f-where', where ?? 'Unknown', where ? '' : 'unknown');
 
-  setFact('f-tls',
-    r.protocol === 'https:' ? 'Encrypted' : 'Not encrypted',
-    r.protocol === 'https:' ? 'good' : 'bad');
-
   const onList = r.verdict?.signals.some((sig: Signal) => sig.id.startsWith('phishing_feed')) ?? false;
   const malware = r.malware?.listed ?? false;
   if (onList || malware) setFact('f-lists', malware ? 'On a malware list' : 'On a scam list', 'bad');
-  else if (r.malware) setFact('f-lists', 'Not listed', 'good');
-  else setFact('f-lists', 'Unknown', 'unknown');
+  // The local scam lists are always checked, even when the online malware
+  // list does not answer, so "not listed" is a real answer here.
+  else setFact('f-lists', 'Not listed', 'good');
+}
+
+// ---------------------------------------------------------------- email
+
+const WEBMAIL = /^https:\/\/(?:mail\.google\.com|outlook\.(?:live|office|office365)\.com)\//;
+
+/** On a Gmail or Outlook tab: is email checking on, and what has it seen here? */
+async function loadMailStatus(tabId: number): Promise<void> {
+  const res = await chrome.runtime.sendMessage({ type: 'GET_MAIL_STATUS', tabId } satisfies Message).catch(() => null);
+  if (!res?.ok || !res.mail) return;
+  const m = res.mail as { on: boolean; checked: number; warned: number; last?: { band: string; title: string; from: string } };
+  const box = $('mail');
+  box.hidden = false;
+  const line = $('mail-line');
+  const last = $('mail-last');
+  if (!m.on) {
+    line.textContent = 'Email checking is off. Turn it on in Settings.';
+    last.hidden = true;
+    return;
+  }
+  line.textContent = m.checked === 0
+    ? 'Open an email and I will check it.'
+    : `I checked ${m.checked} email${m.checked === 1 ? '' : 's'} in this tab. ${m.warned === 0 ? 'None needed a warning.' : `${m.warned} needed a warning.`}`;
+  last.hidden = !m.last;
+  if (m.last) {
+    last.textContent = `Last warning: ${m.last.title}`;
+    last.dataset.band = m.last.band;
+  }
 }
 
 // ---------------------------------------------------------------- actions
@@ -214,7 +256,7 @@ async function mark(verdict: 'phishing' | 'safe'): Promise<void> {
   }
   if (verdict === 'phishing') {
     const share = confirm(
-      'Thanks — I will warn you about this site from now on.\n\n' +
+      'Thanks, I will warn you about this site from now on.\n\n' +
       'Send it to PhishTank as well, so other people get warned too? ' +
       'That opens their site in a new tab; nothing is sent automatically.',
     );
@@ -284,7 +326,7 @@ async function init(): Promise<void> {
   if (!url) {
     iris.setExpression('sad');
     el.headline.textContent = 'I cannot see this tab.';
-    el.advice.textContent = 'Reload the page and open me again — I should be able to read it then.';
+    el.advice.textContent = 'Reload the page and open me again, and I should be able to read it then.';
     return;
   }
 
@@ -297,6 +339,8 @@ async function init(): Promise<void> {
     el.advice.textContent = 'I only check normal websites, so there is nothing for me to do here.';
     return;
   }
+
+  if (WEBMAIL.test(url)) void loadMailStatus(tab.id);
 
   setThinking('Checking this page…');
   // The facts run alongside the verdict rather than after it, so the popup

@@ -75,7 +75,7 @@ export const homographHost: Rule = (e) => {
     return sig({
       id: 'punycode_hostname',
       title: 'Hostname is written in a non-Latin alphabet',
-      detail: `${e.hostname} is an internationalised domain. Usually that is perfectly normal — but it also lets a name be shown that looks like a familiar brand.`,
+      detail: `${e.hostname} is an internationalised domain. Usually that is perfectly normal, but it also lets a name be shown that looks like a familiar brand.`,
       tier: 'url',
       weight: 12,
     });
@@ -202,7 +202,7 @@ export const brandOutsideRegistrable: Rule = (e) => {
       return sig({
         id: 'brand_in_path',
         title: `Address mentions "${token}"`,
-        detail: `"${token}" appears in the page path but this site is ${registrableDomain}. Common on legitimate articles too — weak on its own.`,
+        detail: `"${token}" appears in the page path but this site is ${registrableDomain}. Common on legitimate articles too, so it is weak on its own.`,
         tier: 'url',
         weight: 10,
       });
@@ -429,7 +429,7 @@ export const freeHostingSubdomain: Rule = (e) => {
   return sig({
     id: 'free_hosting_subdomain',
     title: `Hosted free on ${suffix}`,
-    detail: `Anyone can publish a page on ${suffix} in minutes, anonymously and at no cost. Plenty of real projects do — but so does most disposable phishing.`,
+    detail: `Anyone can publish a page on ${suffix} in minutes, anonymously and at no cost. Plenty of real projects do, but so does most disposable phishing.`,
     tier: 'url',
     weight: 12,
   });
@@ -448,7 +448,7 @@ export const generatedDomainLabel: Rule = (e) => {
     return sig({
       id: 'generated_domain_label',
       title: 'Part of the hostname looks auto-generated',
-      detail: `"${label}" does not look like a name anyone chose — ${reason}. Throwaway phishing infrastructure is usually named by a script.`,
+      detail: `"${label}" does not look like a name anyone chose: ${reason}. Throwaway phishing infrastructure is usually named by a script.`,
       tier: 'url',
       weight: 14,
     });

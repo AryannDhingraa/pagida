@@ -48,18 +48,24 @@ export function headlineFor(verdict: Verdict): string {
   if (verdict.override === 'trusted') return 'You told me this one is fine.';
   if (verdict.override === 'reported') return 'You reported this site.';
   if (verdict.band === 'clean' && verdict.urlOnly) return 'Nothing odd about this address.';
+  if (verdict.band === 'caution') {
+    // "A couple of things" over a single finding reads as a template.
+    const n = verdict.signals.filter((s) => s.weight > 0).length;
+    if (n === 1) return 'One thing worth knowing.';
+    if (n > 2) return 'A few things worth knowing.';
+  }
   return BAND_HEADLINE[verdict.band];
 }
 
 export function adviceFor(verdict: Verdict): string {
   if (verdict.override === 'overruled') {
-    return 'You marked this site safe, so I stay quiet about anything I only suspect. This is not that — it is on a confirmed list of attacks, which usually means it has been broken into since you trusted it.';
+    return 'You marked this site safe, so I stay quiet about anything I only suspect. This is not that: it is on a confirmed list of attacks, which usually means it has been broken into since you trusted it.';
   }
   if (verdict.conclusions[0]) return verdict.conclusions[0].detail;
   if (verdict.override === 'trusted') return 'I am not applying guesswork here. I will still warn you if it turns up on a confirmed threat list.';
   if (verdict.override === 'reported') return 'I will keep warning you about it until you undo that.';
   if (verdict.band === 'clean' && verdict.urlOnly) {
-    return 'I could not read the page itself — reload it for the full check.';
+    return 'I could not read the page itself. Reload it for the full check.';
   }
   return BAND_ADVICE[verdict.band];
 }
@@ -74,8 +80,8 @@ export function adviceFor(verdict: Verdict): string {
  * between six cosmetic observations and one positive identification.
  */
 export const CONFIDENCE_NOTE: Record<Confidence, string> = {
-  confirmed: 'Confirmed by a threat-intelligence source — not a guess.',
+  confirmed: 'Confirmed by a threat-intelligence source, not a guess.',
   high: 'Strong evidence: several independent things line up the way an attack does.',
   medium: 'Moderate evidence. Worth a look rather than an alarm.',
-  low: 'Weak evidence — surface details only. Plenty of honest sites look like this.',
+  low: 'Weak evidence: surface details only. Plenty of honest sites look like this.',
 };

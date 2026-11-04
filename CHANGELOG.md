@@ -28,7 +28,21 @@ sentence.
   age of the sender's and links' domains, and Google's threat lists for
   unknown link hostnames. Only domain names are sent; the email itself never
   leaves the computer.
+- Every email gets a quiet "Checked by Pagida" line when nothing is wrong, so
+  you can tell it is working.
+- Gmail and Outlook tabs that were already open when Pagida was installed or
+  updated are checked straight away, without a reload.
+- On a Gmail or Outlook tab the popup shows how many emails were checked there
+  and the last warning.
 - Switch it off in Options: *Check my emails*.
+
+### Popup and report
+- "Nothing found" no longer sits above "Worth a look rather than an alarm".
+- The site facts no longer stay on "checking…": the connection shows at once,
+  and anything without an answer after 8 seconds says so.
+- "One thing worth knowing" when there is one thing, not "a couple".
+- The score ring on the report fits its label, and the report no longer claims
+  that no model is involved.
 
 ### Trained models
 - **Email model**: trained on the Nazario phishing corpus (2019 to 2024),

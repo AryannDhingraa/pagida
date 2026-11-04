@@ -148,7 +148,8 @@ function renderRisk(r: SiteReport): void {
   hb.textContent = 'How the score works';
   how.append(hb, document.createTextNode(
     'Every point above comes from one named check. Add them up and you get the score. ' +
-    'Nothing is hidden and nothing is guessed by a model — you can disagree with any line of it.',
+    'Pagida\'s trained model can only add or take away a few points, and when it does, it is listed above like everything else. ' +
+    'Nothing is hidden, and you can disagree with any line.',
   ));
   p.appendChild(how);
 }
@@ -266,14 +267,14 @@ function renderHost(r: SiteReport): void {
 
   p.appendChild(group(
     'What else is running there',
-    'This comes from Shodan, which scans the internet and publishes what it finds. Pagida never scans anything itself — it only reads what is already public.',
+    'This comes from Shodan, which scans the internet and publishes what it finds. Pagida never scans anything itself. It only reads what is already public.',
     portRows,
   ));
 
   const ip = r.ip;
   p.appendChild(group(
     'Who owns that machine',
-    'An address on its own means nothing to most people. This is the company that operates it and the country it sits in — a bank in your own country hosted on a reseller in another one is worth a second look.',
+    'An address on its own means nothing to most people. This is the company that operates it and the country it sits in. A bank in your own country hosted on a reseller in another one is worth a second look.',
     [
       fact('Network operator', ip?.asnName, ip?.isHosting ? 'warn' : 'plain'),
       fact('Network number', ip?.asn),
@@ -292,7 +293,7 @@ function renderHost(r: SiteReport): void {
       fact('Nameservers', dns?.nameservers?.length ? dns.nameservers.join(', ')
         : r.registration?.nameservers?.length ? r.registration.nameservers.join(', ') : undefined),
       fact('Alias for', dns?.cname?.length ? dns.cname.join(', ') : undefined, 'plain',
-        dns?.cname?.length ? 'This name points at another one — usually a CDN or a site builder' : undefined),
+        dns?.cname?.length ? 'This name points at another one, usually a CDN or a site builder' : undefined),
     ],
   ));
 }
@@ -307,7 +308,7 @@ function renderTech(r: SiteReport): void {
     const msg = document.createElement('p');
     msg.className = 'why';
     msg.textContent =
-      'I have not read this page itself — open the report from the Pagida popup while you are on the site and this fills in.';
+      'I have not read this page itself. Open the report from the Pagida popup while you are on the site and this fills in.';
     p.appendChild(msg);
     return;
   }
@@ -362,7 +363,7 @@ function renderMail(r: SiteReport): void {
 
   p.appendChild(group(
     'Can this domain send you email?',
-    'Real organisations publish records saying which servers may send email in their name. A domain with none of that is trivial to impersonate — and a scam domain rarely bothers.',
+    'Real organisations publish records saying which servers may send email in their name. A domain with none of that is trivial to impersonate, and a scam domain rarely bothers.',
     [
       fact('Set up to receive email', dns?.hasMx === undefined ? undefined : dns.hasMx ? 'Yes' : 'No',
         dns?.hasMx === undefined ? 'unknown' : dns.hasMx ? 'plain' : 'warn'),
@@ -370,7 +371,7 @@ function renderMail(r: SiteReport): void {
       fact('SPF published', dns?.hasSpf === undefined ? undefined : dns.hasSpf ? 'Yes' : 'No', spfTone,
         dns?.hasSpf === false ? 'Anyone can send email claiming to be this domain' : undefined),
       fact('DMARC published', dns?.hasDmarc === undefined ? undefined
-        : dns.hasDmarc ? `Yes — policy: ${dns.dmarcPolicy ?? 'none'}` : 'No', dmarcTone,
+        : dns.hasDmarc ? `Yes, policy: ${dns.dmarcPolicy ?? 'none'}` : 'No', dmarcTone,
         dns?.dmarcPolicy === 'none'
           ? 'Published, but it asks mail providers to do nothing about forgeries'
           : undefined),
@@ -384,7 +385,7 @@ function renderMail(r: SiteReport): void {
   const b = document.createElement('b');
   b.textContent = 'Why this is on a phishing tool';
   note.append(b, document.createTextNode(
-    'Most phishing arrives by email. If a domain has no SPF and no DMARC, forging mail from it costs an attacker nothing — ' +
+    'Most phishing arrives by email. If a domain has no SPF and no DMARC, forging mail from it costs an attacker nothing. ' +
     'so a bank or a government service with those missing is worth a second look, and a brand-new domain with them missing is exactly what you would expect.',
   ));
   p.appendChild(note);
@@ -415,7 +416,7 @@ function renderHeader(r: SiteReport): void {
   const missing = r.unavailable;
   $('sources').textContent =
     'Sources: rdap.org · cloudflare-dns.com · internetdb.shodan.io · crt.sh · ipwho.is · archive.org · urlhaus.abuse.ch' +
-    (missing.length ? ` — no answer from: ${missing.join(', ')}` : '');
+    (missing.length ? `. No answer this time from: ${missing.join(', ')}.` : '');
 }
 
 function showTab(name: string): void {
@@ -487,7 +488,7 @@ $('report-site').addEventListener('click', () => void (async () => {
 $('trust-site').addEventListener('click', () => void (async () => {
   iris.react('sad', 1800);
   await chrome.runtime.sendMessage({ type: 'MARK_SITE', url: target, verdict: 'safe' } satisfies Message);
-  $('verdict').textContent = 'Alright — I will stop scoring this one.';
+  $('verdict').textContent = 'Alright, I will stop scoring this one.';
 })());
 
 void load();

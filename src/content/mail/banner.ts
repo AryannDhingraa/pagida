@@ -33,9 +33,48 @@ ${IRIS_CSS}
 
 const HOST_CLASS = 'pagida-mail-card';
 
+const CHIP_CSS = `
+:host { all: initial; display: block; margin: 0 0 10px; }
+.chip { display: inline-flex; align-items: center; gap: 7px; padding: 4px 11px 4px 8px; border-radius: 999px;
+  font: 500 12px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: #3B424D; background: var(--tint); border: 1px solid var(--line); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--tone); flex: none; }
+`;
+
 export function clearBanner(anchor: HTMLElement): void {
   const prev = anchor.previousElementSibling;
   if (prev?.classList.contains(HOST_CLASS)) prev.remove();
+}
+
+/**
+ * The quiet line on an email with nothing to warn about. Without it, Pagida
+ * working and Pagida not running look identical, and people stop trusting
+ * the silence.
+ */
+export function showChecked(anchor: HTMLElement, v: EmailVerdict): void {
+  clearBanner(anchor);
+  const host = document.createElement('div');
+  host.className = HOST_CLASS;
+  host.dataset.band = v.band;
+  host.dataset.conclusions = '';
+  const root = host.attachShadow({ mode: 'closed' });
+  const style = document.createElement('style');
+  style.textContent = CHIP_CSS;
+  const chip = document.createElement('span');
+  chip.className = 'chip';
+  chip.style.setProperty('--tone', TONES[v.band]);
+  chip.style.setProperty('--tint', TINTS[v.band]);
+  chip.style.setProperty('--line', v.band === 'clean' ? '#CFEBDD' : '#D3E1F8');
+  const dot = document.createElement('span');
+  dot.className = 'dot';
+  const top = v.signals.find((x) => x.weight > 0);
+  const label = document.createElement('span');
+  label.textContent = v.band === 'clean' || !top
+    ? 'Checked by Pagida. Nothing wrong found.'
+    : `Checked by Pagida. Worth a look: ${top.title.charAt(0).toLowerCase()}${top.title.slice(1)}.`;
+  chip.append(dot, label);
+  root.append(style, chip);
+  anchor.parentElement?.insertBefore(host, anchor);
 }
 
 export function showBanner(anchor: HTMLElement, v: EmailVerdict): void {
