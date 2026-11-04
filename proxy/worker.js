@@ -1,82 +1,57 @@
 /**
- * Pagida API proxy — a Cloudflare Worker.
+ * Pagida API proxy, v5 — a Cloudflare Worker.
  *
  * WHY THIS EXISTS
  *
- * Pagida should give everyone the full service without asking them to go and
- * register for API keys. But an extension is a zip file: anything shipped
- * inside it is public the moment someone unzips it, and a key posted publicly
- * gets scraped, abused and revoked within days. There is no clever way around
- * that — obfuscation just makes it take an afternoon instead of a minute.
+ * Google's Web Risk list needs an API key, and a key shipped inside an
+ * extension is public the moment someone unzips it. So the key lives here and
+ * the extension asks this Worker. Since Pagida v5 this is a backup, not the
+ * main engine: the extension checks pages offline first, skips the world's top
+ * 10,000 sites, never asks about a page it has already caught, and remembers
+ * clean answers for a day. Most visits never reach this Worker at all.
  *
- * So the keys live here instead, on a server the extension talks to. Users get
- * the service for free and never see a key.
+ * WHAT CHANGED FROM v4, AND WHY
  *
- * WHAT THIS COSTS
+ * v4 counted every request with three Workers KV writes. The KV free plan
+ * allows 1,000 writes a day, and 1 write per second to the same key, and the
+ * global counter was the same key every time. So the proxy stopped working
+ * after about 330 lookups a day, and concurrent users collided before that.
+ * Its daily ceiling (60,000) was also far above Web Risk's free 100,000 a
+ * month, so fixing KV alone could have produced a bill of hundreds of dollars.
  *
- * Cloudflare Workers: 100,000 requests/day free.
- * Google Web Risk:    100,000 lookups/month free, and commercial use is allowed
- *                     — which is the whole reason Pagida uses Web Risk here
- *                     rather than the Safe Browsing API, whose free tier is
- *                     non-commercial only and could not legally be resold this
- *                     way even for free.
+ * v5 uses no KV at all:
+ *   BUDGET   A Durable Object holds the one global daily counter. One object,
+ *            strongly consistent, so the ceiling is exact. DAILY_BUDGET is set
+ *            so a full month stays inside Web Risk's free 100,000 lookups.
+ *   LIMITER  Cloudflare's rate-limiting binding, per IP and per install, to
+ *            stop one client from eating the day's budget. Approximate and per
+ *            location by design, which is fine for this job.
+ *   MEMO     A per-isolate in-memory cache of recent answers, so a burst of
+ *            users on the same site costs one upstream call.
+ * If either binding is missing the Worker fails CLOSED (answers "busy"), never
+ * open: an unmetered proxy is how a free project gets a bill.
  *
- * WHAT IT COSTS THE USER, WHICH IS THE PART THAT MATTERS
+ * PRIVACY
  *
- * This server sees the domain names it is asked about. That is a real change to
- * Pagida's privacy story and it has to be stated plainly rather than buried:
- *  - Only the domain is ever sent, never the full URL, never the page. The
- *    sanitiser below rejects anything containing a path, so a bug in the
- *    extension cannot leak a URL here even by accident.
- *  - Nothing is logged. No IP, no install id, no query history, no analytics.
- *  - It is ON by default, and that is a deliberate call rather than an
- *    oversight: a protection nobody finds in a settings screen protects
- *    nobody, and the people most likely to be phished are the least likely to
- *    go looking. The trade is disclosed in the extension's own words on the
- *    options page and in the store listing, and one switch turns it off.
- *  - The keyless sources keep working with it switched off, so refusing costs
- *    the user some depth, never the product.
+ * Only a bare domain name is accepted; anything with a path is refused.
+ * Nothing is logged or stored except the day's request count.
  *
- * DEPLOY
+ * DEPLOY (from this folder)
  *
- *   npm create cloudflare@latest pagida-proxy
- *   # replace src/index.js with this file
+ *   npm install
  *   npx wrangler secret put WEB_RISK_KEY
- *   npx wrangler kv namespace create QUOTA
- *   # put the id into wrangler.toml as the QUOTA binding
  *   npx wrangler deploy
  *
- * Then set PAGIDA_API_BASE in the extension build to the deployed URL.
+ * wrangler.jsonc declares the Durable Object, its migration and the two rate
+ * limiters. Delete the old KV namespace in the dashboard afterwards.
  */
 
 const ALLOWED_ORIGIN_PREFIX = 'chrome-extension://';
 
-/**
- * ABUSE CONTROL
- *
- * An earlier version of this file rate-limited on the install id alone and
- * admitted in a comment that anyone could forge the header. That is true, and
- * it is not a small problem: a forged id is a fresh bucket, so an attacker with
- * a loop could spend the whole month's Web Risk allowance in an afternoon and
- * every real user would silently lose the feature.
- *
- * Three buckets now, checked in order of how expensive they are to evade:
- *
- *   GLOBAL   A hard ceiling on total upstream calls per day. Forgeable
- *            identifiers cannot get past this one, because it does not depend
- *            on any identifier at all. It is the actual budget guarantee; the
- *            other two exist to stop one client eating that budget.
- *   NETWORK  Per source IP, which Cloudflare supplies and a client cannot set.
- *            Evading it costs real infrastructure.
- *   INSTALL  Per install id. Trivially forgeable, kept because it is the one
- *            that correctly separates several users behind one office NAT.
- *
- * Every key is a hash, never the raw value, and every key expires daily. The
- * server therefore cannot reconstruct who asked about what even if it wanted to.
- */
-const GLOBAL_DAILY_LIMIT = 60_000;   // of the 100k/month Web Risk allowance
-const NETWORK_DAILY_LIMIT = 2_000;   // generous for a NAT, useless for a script
-const INSTALL_DAILY_LIMIT = 250;
+/** 3,000 a day x 31 days = 93,000: inside Web Risk's free 100,000 a month. */
+const DAILY_BUDGET = 3000;
+const MEMO_TTL_MS = 60 * 60 * 1000;
+const MEMO_MAX = 2000;
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -92,65 +67,63 @@ function json(body, status = 200) {
   });
 }
 
-/** Short, stable, and irreversible — so no key in KV is a raw identifier. */
-async function hashKey(value) {
-  const bytes = new TextEncoder().encode(`pagida:${value}`);
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
-  return [...new Uint8Array(digest).slice(0, 8)]
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-
-/**
- * Increment one counter and report whether it is still under its ceiling.
- *
- * Deliberately not atomic. KV is eventually consistent, so two simultaneous
- * requests can both read the same value and under-count — which means the real
- * ceiling is fuzzy at the edges. That is the correct trade here: the failure
- * mode is spending slightly more of a free allowance than intended, and the
- * alternative (Durable Objects) costs money to avoid a rounding error. If this
- * ever guards something billable, move it.
- */
-async function underLimit(env, key, limit, ttlSeconds = 60 * 60 * 26) {
-  if (!env.QUOTA) return true; // no KV bound — fail open rather than break
-  const used = Number((await env.QUOTA.get(key)) ?? 0);
-  if (used >= limit) return false;
-  await env.QUOTA.put(key, String(used + 1), { expirationTtl: ttlSeconds });
-  return true;
-}
-
-/**
- * The three buckets, cheapest to evade last.
- *
- * Returns null when the request may proceed, or a short reason when it may not.
- * The reason is never sent to the client — a rate limiter that tells you which
- * limit you hit is a rate limiter that tells you how to route around it.
- */
-async function checkQuota(env, request, installId) {
-  const day = new Date().toISOString().slice(0, 10);
-
-  if (!(await underLimit(env, `g:${day}`, GLOBAL_DAILY_LIMIT))) return 'global';
-
-  const ip = request.headers.get('CF-Connecting-IP') ?? '';
-  if (ip) {
-    const key = `n:${day}:${await hashKey(ip)}`;
-    if (!(await underLimit(env, key, NETWORK_DAILY_LIMIT))) return 'network';
-  }
-
-  const key = `i:${day}:${await hashKey(installId)}`;
-  if (!(await underLimit(env, key, INSTALL_DAILY_LIMIT))) return 'install';
-
-  return null;
-}
-
 /** Only ever accept a bare hostname. Never a path, never a query string. */
-function cleanDomain(raw) {
+export function cleanDomain(raw) {
   if (!raw) return null;
   const value = raw.trim().toLowerCase();
   if (value.length > 253) return null;
   if (!/^[a-z0-9.-]+$/.test(value)) return null;
-  if (!value.includes('.')) return null;
+  if (!value.includes('.') || value.startsWith('.') || value.endsWith('.') || value.includes('..')) return null;
   return value;
+}
+
+/** Short-lived memory of answers, per isolate. */
+const memo = new Map();
+function memoGet(domain) {
+  const hit = memo.get(domain);
+  if (!hit) return null;
+  if (Date.now() - hit.at > MEMO_TTL_MS) { memo.delete(domain); return null; }
+  return hit.value;
+}
+function memoSet(domain, value) {
+  if (memo.size >= MEMO_MAX) memo.delete(memo.keys().next().value);
+  memo.set(domain, { at: Date.now(), value });
+}
+
+/**
+ * The global daily budget. One Durable Object instance per day, so the count
+ * is exact everywhere in the world.
+ */
+export class Budget {
+  constructor(state) {
+    this.state = state;
+  }
+
+  async fetch(request) {
+    const limit = Number(new URL(request.url).searchParams.get('limit') ?? DAILY_BUDGET);
+    const used = (await this.state.storage.get('used')) ?? 0;
+    if (used >= limit) return new Response('spent', { status: 429 });
+    await this.state.storage.put('used', used + 1);
+    return new Response(String(used + 1));
+  }
+}
+
+/** True when this request may spend one upstream lookup. */
+async function spend(env, request, installId) {
+  // Fail closed: no meter, no lookups.
+  if (!env.BUDGET || !env.IP_LIMITER || !env.INSTALL_LIMITER) return false;
+
+  const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
+  const [byIp, byInstall] = await Promise.all([
+    env.IP_LIMITER.limit({ key: `ip:${ip}` }),
+    env.INSTALL_LIMITER.limit({ key: `install:${installId}` }),
+  ]);
+  if (!byIp.success || !byInstall.success) return false;
+
+  const day = new Date().toISOString().slice(0, 10);
+  const stub = env.BUDGET.get(env.BUDGET.idFromName(day));
+  const res = await stub.fetch(`https://budget/spend?limit=${DAILY_BUDGET}`);
+  return res.ok;
 }
 
 async function webRisk(env, domain) {
@@ -158,27 +131,17 @@ async function webRisk(env, domain) {
 
   // Web Risk takes a URI. A bare https:// on the domain is enough to get a
   // verdict on the site without the proxy ever seeing a path.
-  const uri = `https://${domain}/`;
-  const params = new URLSearchParams({ uri, key: env.WEB_RISK_KEY });
-  for (const type of ['MALWARE', 'SOCIAL_ENGINEERING', 'UNWANTED_SOFTWARE']) {
-    params.append('threatTypes', type);
-  }
+  const params = new URLSearchParams({ uri: `https://${domain}/`, key: env.WEB_RISK_KEY });
+  for (const type of ['MALWARE', 'SOCIAL_ENGINEERING', 'UNWANTED_SOFTWARE']) params.append('threatTypes', type);
 
-  const res = await fetch(`https://webrisk.googleapis.com/v1/uris:search?${params}`, {
-    cf: { cacheTtl: 900, cacheEverything: true },
-  });
+  const res = await fetch(`https://webrisk.googleapis.com/v1/uris:search?${params}`);
   if (!res.ok) {
-    // Surface Google's own reason. Its error bodies name the problem (an
-    // invalid key, a disabled API) and never echo the key itself, so this is
-    // safe to return and is the difference between a five-minute fix and an
-    // afternoon of guessing.
     let detail = '';
     try {
       const body = await res.json();
       detail = body?.error?.message ?? body?.error?.status ?? '';
     } catch { /* not JSON */ }
-    // Belt and braces: Google does not echo the key in its errors, but this
-    // response is public and a security tool should not rely on that.
+    // Google does not echo the key in its errors, but this response is public.
     const safe = String(detail).replace(/AIza[0-9A-Za-z_-]{10,}/g, '[key]');
     return { error: `upstream-${res.status}`, detail: safe.slice(0, 220) };
   }
@@ -194,40 +157,33 @@ async function webRisk(env, domain) {
 
 export default {
   async fetch(request, env) {
-    if (request.method === 'OPTIONS') {
-      return new Response(null, { status: 204, headers: CORS });
-    }
-    if (request.method !== 'GET') {
-      return json({ error: 'method-not-allowed' }, 405);
-    }
+    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
+    if (request.method !== 'GET') return json({ error: 'method-not-allowed' }, 405);
 
     const url = new URL(request.url);
 
     if (url.pathname === '/v1/health') {
-      return json({ ok: true, webRisk: Boolean(env.WEB_RISK_KEY) });
+      return json({ ok: true, webRisk: Boolean(env.WEB_RISK_KEY), metered: Boolean(env.BUDGET && env.IP_LIMITER && env.INSTALL_LIMITER) });
     }
 
-    // Extensions send an Origin of chrome-extension://<id>. This is a courtesy
-    // check, not a security boundary — anyone can forge a header — which is
-    // exactly why the quota below is what actually protects the budget.
+    // A courtesy check, not a security boundary: the meter is what protects the budget.
     const origin = request.headers.get('Origin') ?? '';
-    const looksLikeExtension = origin === '' || origin.startsWith(ALLOWED_ORIGIN_PREFIX);
-    if (!looksLikeExtension) return json({ error: 'forbidden' }, 403);
+    if (!(origin === '' || origin.startsWith(ALLOWED_ORIGIN_PREFIX))) return json({ error: 'forbidden' }, 403);
+
+    if (url.pathname !== '/v1/webrisk') return json({ error: 'not-found' }, 404);
+
+    const domain = cleanDomain(url.searchParams.get('domain'));
+    if (!domain) return json({ error: 'bad-domain' }, 400);
+
+    // A remembered answer costs nothing, so it is served before the meter.
+    const remembered = memoGet(domain);
+    if (remembered) return json(remembered);
 
     const installId = (request.headers.get('X-Pagida-Install') ?? '').slice(0, 64) || 'anonymous';
+    if (!(await spend(env, request, installId))) return json({ error: 'busy' }, 429);
 
-    // Quota is checked before the route, so an unknown path cannot be used as a
-    // free way to probe whether the service is up.
-    if (await checkQuota(env, request, installId)) {
-      return json({ error: 'busy' }, 429);
-    }
-
-    if (url.pathname === '/v1/webrisk') {
-      const domain = cleanDomain(url.searchParams.get('domain'));
-      if (!domain) return json({ error: 'bad-domain' }, 400);
-      return json(await webRisk(env, domain));
-    }
-
-    return json({ error: 'not-found' }, 404);
+    const answer = await webRisk(env, domain);
+    if (!answer.error) memoSet(domain, answer);
+    return json(answer);
   },
 };

@@ -21,7 +21,9 @@
  */
 import type { Band, Confidence, Conclusion, PageEvidence, Rule, Signal, Verdict } from './types.js';
 import { ALL_RULES } from './rules/index.js';
-import { concludeFrom, floorFrom, higherBand } from './conclusions.js';
+import { concludeFrom, floorFrom, higherBand, bandRank } from './conclusions.js';
+import { isPrivateHost } from './util/network.js';
+import { modelSignal } from './model.js';
 
 /**
  * Band boundaries, chosen from the evaluation curve rather than from round
@@ -95,6 +97,24 @@ export function evaluate(e: PageEvidence, opts: EvaluateOptions = {}): Verdict {
     };
   }
 
+  // --- the user's own network ---
+  if (isPrivateHost(e.hostname)) {
+    return {
+      ...base,
+      score: 0,
+      band: 'clean',
+      conclusions: [],
+      confidence: 'medium',
+      signals: [{
+        id: 'private_network_host',
+        title: 'This is on your own network or computer',
+        detail: `${e.hostname} is a local address, like a router, a home server or a development site. Scams reach people from the public internet, so Pagida does not score these and never looks them up anywhere.`,
+        tier: 'url',
+        weight: 0,
+      }],
+    };
+  }
+
   // --- run every rule ---
   const signals: Signal[] = [];
   for (const rule of rules) {
@@ -105,6 +125,10 @@ export function evaluate(e: PageEvidence, opts: EvaluateOptions = {}): Verdict {
     const tunable = (s.tier === 'url' || s.tier === 'dom') && s.certainty !== 'confirmed';
     signals.push(tunable ? { ...s, weight: Math.round(s.weight * multiplier) } : s);
   }
+  // The trained model reads the heuristics that fired and adds one bounded
+  // signal. It runs before the conclusions but they never look at it.
+  const learned = modelSignal(e, signals);
+  if (learned) signals.push(learned);
   signals.sort((a, b) => b.weight - a.weight);
 
   const conclusions = concludeFrom(e, signals);
@@ -159,7 +183,7 @@ export function evaluate(e: PageEvidence, opts: EvaluateOptions = {}): Verdict {
   // --- normal path: the sum proposes, the conclusions dispose ---
   const raw = signals.reduce((sum, s) => sum + s.weight, 0);
   const score = Math.max(0, Math.min(100, raw));
-  const band = higherBand(bandFor(score), floorFrom(conclusions));
+  const band = higherBand(capHeuristics(bandFor(score), e, signals, conclusions), floorFrom(conclusions));
 
   return {
     ...base,
@@ -169,6 +193,32 @@ export function evaluate(e: PageEvidence, opts: EvaluateOptions = {}): Verdict {
     confidence: confidenceFrom(signals, conclusions, band),
     signals,
   };
+}
+
+/**
+ * A pile of cosmetic observations is not a verdict.
+ *
+ * v3 let the sum alone reach `danger`, the band that says "do not type your
+ * password here". Without a conclusion or a confirmed match, heuristics now
+ * stop at `suspicious`, and on a domain that has existed for two years they
+ * stop at `caution`: an old domain with an odd-looking address is a quirk,
+ * not an attack, until the page itself does something an attack does.
+ */
+const ADDRESS_IMPERSONATION = new Set([
+  'brand_in_subdomain', 'brand_typosquat', 'brand_confusable_domain', 'brand_on_foreign_tld', 'mixed_script_hostname',
+]);
+
+export function capHeuristics(band: Band, e: PageEvidence, signals: Signal[], conclusions: Conclusion[]): Band {
+  if (conclusions.length > 0) return band;
+  if (signals.some((s) => s.certainty === 'confirmed' && s.weight > 0)) return band;
+  // The address itself impersonating a brand is not cosmetic: that is the
+  // attack, written where everyone can read it.
+  if (signals.some((s) => ADDRESS_IMPERSONATION.has(s.id))) return band;
+  // Old domains are softened, except where the address shows the site has
+  // been broken into: phishing kits live on old, hacked WordPress sites.
+  const compromised = signals.some((s) => s.id === 'wordpress_internal_path' || s.id === 'wordpress_upload_path');
+  const ceiling: Band = (e.domainAgeDays ?? 0) >= 730 && !compromised ? 'caution' : 'suspicious';
+  return bandRank(band) > bandRank(ceiling) ? ceiling : band;
 }
 
 /**

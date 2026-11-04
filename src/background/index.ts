@@ -5,14 +5,19 @@
  * variable. Verdicts are held in a small in-memory map purely as a cache; if
  * the worker dies the popup simply asks the tab to re-report.
  */
-import type { DomEvidence, Verdict } from '../core/types.js';
+import type { DomEvidence, PageEvidence, Verdict } from '../core/types.js';
 import { evidenceFromUrl, isAnalysable } from '../core/evidence.js';
 import { BAND_NAME, evaluate, summarise } from '../core/score.js';
 import { parseHost } from '../core/util/domain.js';
+import { isPrivateHost, isSharedHost } from '../core/util/network.js';
+import { BRAND_DOMAINS, isWellKnown } from '../core/data/index.js';
 import { domainAgeDays } from '../services/rdap.js';
 import { fetchFeed, loadFeed, normaliseUrl, saveFeed } from '../services/feeds.js';
 import { safeBrowsingLookup } from '../services/safebrowsing.js';
 import { lookupReputation } from '../services/pagidaApi.js';
+import { forget, rememberClean, rememberedClean, bumpLookupStat } from '../services/memory.js';
+import { blocklistSize, getIndex, listed, refreshBlocklist } from '../services/blocklist.js';
+import { logoBrands } from '../services/logo.js';
 import { buildReport, type TechFacts } from '../services/report.js';
 import { animateIcon, setIconBand } from './icon.js';
 import {
@@ -49,6 +54,8 @@ async function ensureFeed(force = false): Promise<void> {
     try {
       const settings = await getSettings();
       if (!settings.useFeeds) return;
+      // The big list refreshes itself at most once a day, in the background.
+      void refreshBlocklist(force);
 
       const current = await loadFeed();
       const stale = Date.now() - current.updatedAt > FEED_MAX_AGE_MS;
@@ -105,7 +112,7 @@ async function score(url: string, dom?: DomEvidence): Promise<Verdict | null> {
   if (!base) return null;
 
   const settings = await getSettings();
-  const evidence = { ...base, dom };
+  const evidence: PageEvidence = { ...base, dom: dom ? { ...dom } : undefined };
 
   // User's own call on this host, if any.
   const marks = await getMarks();
@@ -113,37 +120,82 @@ async function score(url: string, dom?: DomEvidence): Promise<Verdict | null> {
   if (mark?.verdict === 'safe') evidence.userTrusted = true;
   if (mark?.verdict === 'phishing') evidence.userReported = true;
 
-  if (!evidence.userTrusted && !evidence.userReported) {
-    // Feeds — local set membership, no network at lookup time.
-    if (settings.useFeeds) {
-      const feed = await loadFeed();
-      if (feed.urls.size > 0) {
-        evidence.feedUrlHit = feed.urls.has(normaliseUrl(url));
-        evidence.feedHostHit = feed.hosts.has(base.hostname);
-      }
+  // Local addresses are never looked up anywhere: no RDAP, no Pagida service,
+  // no Safe Browsing. An internal hostname is not ours to send.
+  const local = isPrivateHost(base.hostname);
+  const { sld, registrableDomain } = parseHost(base.hostname);
+  const known = BRAND_DOMAINS.has(registrableDomain) || isWellKnown(registrableDomain);
+  const opts = { sensitivity: settings.sensitivity };
+
+  if (evidence.userTrusted || evidence.userReported || local) return evaluate(evidence, opts);
+
+  // ---- 1. Local checks: free, offline, every visit, never remembered. ----
+  if (settings.useFeeds) {
+    const feed = await loadFeed();
+    if (feed.urls.size > 0) {
+      evidence.feedUrlHit = feed.urls.has(normaliseUrl(url));
+      // A host-level match only means something on a host one party owns.
+      // v3 matched s3.us-east-2.amazonaws.com and so flagged every S3 file
+      // in that region as "confirmed phishing", with no way to silence it.
+      evidence.feedHostHit = feed.hosts.has(base.hostname) && !isSharedHost(base.hostname, sld, known);
     }
-    // RDAP — sends the registrable domain only.
-    if (settings.useRdap) {
-      const age = await domainAgeDays(base.hostname);
-      if (age !== undefined) evidence.domainAgeDays = age;
-    }
-    // The Pagida service — sends the domain only, and gives every user the
-    // key-gated threat list without asking them to register for anything.
-    if (settings.usePagidaService) {
+    const index = await getIndex();
+    if (index) evidence.blocklistHit = listed(index, base.hostname);
+  }
+
+  // Logo matching only where it can change the answer: an unknown site that
+  // asks for a secret or behaves like a lure.
+  if (evidence.dom && !known) {
+    const d = evidence.dom;
+    const worthIt = d.hasPasswordField || d.asksCard || d.asksOneTimeCode || d.asksSeedPhrase || d.documentLure || d.cryptoLure;
+    if (worthIt) d.logoBrands = await logoBrands(d.faviconUrl);
+  }
+
+  // Domain age: free (rdap.org, not the Pagida service) and cached for a
+  // week, so it is part of the local picture. Top sites are old by definition.
+  if (settings.useRdap && !known) {
+    const age = await domainAgeDays(base.hostname);
+    if (age !== undefined) evidence.domainAgeDays = age;
+  }
+
+  const first = evaluate(evidence, opts);
+  const namedReason = first.conclusions.some((c) => c.floor === 'danger');
+
+  // ---- 2. Remote checks, only when they can still change the answer. ----
+  // A page the local engine already calls an attack needs no second opinion.
+  // Top sites and brand domains are covered by Chrome's own Safe Browsing.
+  // Anything else is asked at most once a day per site (lookup memory).
+  let asked = false;
+  if (settings.usePagidaService && !namedReason && !known) {
+    if (await rememberedClean(base.hostname)) {
+      void bumpLookupStat('remembered');
+    } else {
       const rep = await lookupReputation(base.hostname);
+      asked = true;
+      void bumpLookupStat('asked');
       if (rep) {
         evidence.webRiskHit = rep.listed;
         evidence.webRiskThreats = rep.threatTypes;
+        if (!rep.listed) await rememberClean(base.hostname);
       }
     }
-    // Safe Browsing — sends the full URL, so it is opt-in with the user's key.
-    if (settings.useSafeBrowsing && settings.safeBrowsingKey) {
-      const hit = await safeBrowsingLookup(url, settings.safeBrowsingKey);
-      if (hit !== undefined) evidence.safeBrowsingHit = hit;
-    }
+  } else if (settings.usePagidaService) {
+    void bumpLookupStat('skipped');
+  }
+  // Safe Browsing — sends the full URL, so it is opt-in with the user's key.
+  if (settings.useSafeBrowsing && settings.safeBrowsingKey && !namedReason) {
+    const hit = await safeBrowsingLookup(url, settings.safeBrowsingKey);
+    if (hit !== undefined) evidence.safeBrowsingHit = hit;
+    asked = true;
   }
 
-  return evaluate(evidence, { sensitivity: settings.sensitivity });
+  const verdict = asked ? evaluate(evidence, opts) : first;
+
+  // The page looks wrong: whatever was remembered about this site is stale.
+  if (verdict.band === 'suspicious' || verdict.band === 'danger' || verdict.conclusions.length > 0) {
+    await forget(base.hostname);
+  }
+  return verdict;
 }
 
 // ---------------------------------------------------------------- messages
@@ -178,7 +230,12 @@ chrome.runtime.onMessage.addListener((msg: Message, sender, sendResponse) => {
           // Iris steps onto the page from "suspicious" upward, not only at the
           // top band — the old build stayed silent through the whole middle of
           // the range, which is where most real judgement calls live.
-          const speaks = verdict.band === 'suspicious' || verdict.band === 'danger';
+          // Iris only steps onto the page when the engine can say WHY in one
+          // sentence: a conclusion or a confirmed match. Heuristics alone
+          // colour the badge and wait in the popup. Interrupting someone on
+          // cosmetic evidence is how v3 taught people to ignore her.
+          const speaks = verdict.band === 'danger'
+            || (verdict.band === 'suspicious' && verdict.conclusions.length > 0);
           if (speaks) {
             if (isNewPage || previous?.band !== verdict.band) await bumpStat('warnings');
             if (settings.showBanner && verdict.override !== 'trusted') {
@@ -231,10 +288,10 @@ chrome.runtime.onMessage.addListener((msg: Message, sender, sendResponse) => {
         }
 
         case 'REFRESH_FEED': {
-          const snapshot = await fetchFeed();
+          const [snapshot] = await Promise.all([fetchFeed(), refreshBlocklist(true)]);
           if (!snapshot) return sendResponse({ ok: false, error: 'feed-unavailable' });
           await saveFeed(snapshot);
-          return sendResponse({ ok: true, feedCount: snapshot.urls.length, updatedAt: snapshot.updatedAt });
+          return sendResponse({ ok: true, feedCount: snapshot.urls.length + blocklistSize(), updatedAt: snapshot.updatedAt });
         }
 
         case 'BUILD_REPORT': {

@@ -24,7 +24,8 @@ import { evidenceFromUrl } from '../src/core/evidence.js';
 import { evaluate } from '../src/core/score.js';
 import { URL_RULES } from '../src/core/rules/url.js';
 import { BAND_THRESHOLDS } from '../src/core/score.js';
-import { ALLOWLIST_SIZE, ALLOWLIST_SOURCE_RANK_LIMIT } from '../src/core/data/allowlist.js';
+import { ALLOWLIST_SIZE, isWellKnown } from '../src/core/data/allowlist.js';
+import { parseHost } from '../src/core/util/domain.js';
 
 const OPENPHISH = 'https://raw.githubusercontent.com/openphish/public_feed/main/feed.txt';
 const TOP_SITES = 'https://raw.githubusercontent.com/zer0h/top-1000000-domains/master/top-10000-domains';
@@ -35,8 +36,10 @@ const TOP_SITES = 'https://raw.githubusercontent.com/zer0h/top-1000000-domains/m
  * told to trust would be circular and would produce a flattering, meaningless
  * number.
  */
-const NEGATIVE_RANK_FROM = ALLOWLIST_SOURCE_RANK_LIMIT;
-const NEGATIVE_RANK_TO = ALLOWLIST_SOURCE_RANK_LIMIT + 2000;
+// v5: the allowlist is the Tranco top 10,000, a different ranking from this
+// one, so the negatives are this list's top 10,000 minus anything allowlisted.
+const NEGATIVE_RANK_FROM = 0;
+const NEGATIVE_RANK_TO = 10000;
 
 /**
  * Real login and account URLs from services people actually use. These are the
@@ -157,7 +160,10 @@ async function main(): Promise<void> {
 
   const positives = collect(phishRaw);
   const easyNegatives = collect(
-    topRaw.slice(NEGATIVE_RANK_FROM, NEGATIVE_RANK_TO).map((d) => `https://${d}/`),
+    topRaw.slice(NEGATIVE_RANK_FROM, NEGATIVE_RANK_TO)
+      .filter((d) => !isWellKnown(parseHost(d).registrableDomain))
+      .slice(0, 2000)
+      .map((d) => `https://${d}/`),
   );
   const hardNegatives = collect(HARD_NEGATIVES);
   const allNegatives = [...easyNegatives, ...hardNegatives];
@@ -165,7 +171,7 @@ async function main(): Promise<void> {
   console.log(`positives        ${positives.length}  (OpenPhish community feed, fetched today)`);
   console.log(`easy negatives   ${easyNegatives.length}  (top sites, ranks ${NEGATIVE_RANK_FROM + 1}-${NEGATIVE_RANK_TO})`);
   console.log(`hard negatives   ${hardNegatives.length}  (real brand login and account URLs)`);
-  console.log(`allowlist        ${ALLOWLIST_SIZE} domains (ranks 1-${ALLOWLIST_SOURCE_RANK_LIMIT}) — disjoint from the negatives above\n`);
+  console.log(`allowlist        ${ALLOWLIST_SIZE} domains (Tranco top 10,000), removed from the negatives above\n`);
 
   const shipping = BAND_THRESHOLDS.suspicious;
   const sweep: Metrics[] = [];

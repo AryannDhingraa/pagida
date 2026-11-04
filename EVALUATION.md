@@ -1,5 +1,73 @@
 # Evaluation
 
+## v5: the whole engine, in a real browser (4 November 2026)
+
+The URL-only numbers further down never measured false alarms on real pages,
+and every false alarm users reported came from the page-content layer. v5 is
+measured end to end instead: `tools/harness/compare.cjs` loads the old and the
+new build into the same headless Chromium, visits each page once, and records
+both verdicts for the same page at the same moment. The Pagida service is
+switched off in both before the first visit.
+
+**Legitimate sites**: 164 commonly used sites (banks, government, shopping,
+streaming, SaaS log-in pages) plus 300 random Tranco top-50,000 home pages.
+327 loaded and were scored by both builds.
+
+| On 327 real sites | v3.0.1 | v5.0.0 |
+|---|---:|---:|
+| "Likely phishing" | 15 | 0 |
+| "Suspicious" | 9 | 2 |
+| "Worth a look" | 36 | 9 |
+| Iris popped up on the page | 15 | 0 |
+| Real log-in pages called "Likely phishing" (41) | 15 | 0 |
+| Your own network (router, localhost dev site, local app) | 2 "Likely phishing", 1 "Worth a look" | all clean, never looked up |
+
+The two v5 "Suspicious" results are week-old domains with nothing else wrong;
+neither makes Iris appear.
+
+**Phishing**: one URL per host from that morning's OpenPhish feed (234), with
+both blocklists switched off so they cannot mark their own homework. 172 were
+still serving something other than a takedown or error page.
+
+| On 172 live phishing pages, engine only | v3.0.1 | v5.0.0 |
+|---|---:|---:|
+| Flagged at any level | 149 | 154 |
+| "Suspicious" or worse | 111 | 119 |
+| "Likely phishing" | 18 | 19 |
+| Iris popped up on the page | 18 | 42 |
+
+v5 scored 12 of these pages higher than v3 and 4 lower. Two of the four are
+heuristic-only pages that v5 deliberately caps at "Suspicious".
+
+**Attack pages Pagida had never seen** (`tools/harness/attack-pages`, served
+over plain http, which gives v3 a head start):
+
+| Page | v3.0.1 | v5.0.0 |
+|---|---|---|
+| Fake CAPTCHA that copies a PowerShell command (ClickFix) | Worth a look; command stays on the clipboard | Likely phishing; command replaced with a warning |
+| Developer docs that copy `curl … \| bash` | Worth a look (http) | Worth a look (http); command left alone |
+| Cloned Microsoft sign-in (two-step) | Likely phishing (only because of http) | Likely phishing: "copy of Microsoft's sign-in page" |
+| Recovery-phrase form | Worth a look | Likely phishing |
+| Fake virus warning with a phone number | Worth a look | Likely phishing |
+| Fake Google pop-up window (browser-in-the-browser) | Suspicious | Likely phishing |
+| Login form that posts to a Telegram bot | Likely phishing (only because of http) | Likely phishing: "goes to a Telegram bot" |
+| Ordinary shop checkout with a card form | Worth a look (http) | Worth a look (http) |
+| Copied CommBank NetBank log-on | Likely phishing | Likely phishing |
+
+**URL tier alone** (`npm run evaluate`, same day's OpenPhish feed, 2,040
+negatives): at "Worth a look" 96.2% precision and 68.3% recall (v1: 94.5% and
+62.7%); at "Suspicious" 100% precision and 40.0% recall (v1: 97.8% and 30.3%);
+0 false positives on the 40 hard-negative brand log-in URLs.
+
+**What this does not show.** The phishing set is one morning of one feed. The
+trained model in `src/core/model.ts` ships switched off: of 500 sampled
+Phishing.Database links only one was still serving a live phishing page, and
+`scripts/train-model.py` refuses to train on fewer than 300.
+
+---
+
+## v1 to v3: the URL tier
+
 **Last reproduced: 16 September 2026, against that day's OpenPhish feed
 (300 confirmed phishing URLs, 2,000 top-site negatives, 40 hand-built real
 brand login URLs). Engine: v3.0.1.** Rerun it yourself with `npm run evaluate`;

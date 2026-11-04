@@ -29,7 +29,27 @@
  */
 import type { Band, Conclusion, PageEvidence, Signal } from './types.js';
 import { parseHost } from './util/domain.js';
-import { BRAND_DOMAINS } from './data/index.js';
+import { BRAND_DOMAINS, isWellKnown } from './data/index.js';
+import { isIdentityProvider } from './data/idp.js';
+import { asksForSecret, falseClaims } from './identity.js';
+
+/** A password box the person can actually see and type into. */
+const asksForPassword = (e: PageEvidence): boolean =>
+  !!e.dom?.hasPasswordField && e.dom.passwordFieldVisible !== false;
+
+/** The password form posts to a third party that is not a known sign-in provider. */
+const postsToStranger = (e: PageEvidence): boolean => {
+  const dom = e.dom;
+  if (!dom?.crossOriginPasswordForm) return false;
+  const here = parseHost(e.hostname).registrableDomain;
+  if (dom.passwordFormActions.length === 0) return true;
+  return dom.passwordFormActions.some((a) => {
+    try {
+      const d = parseHost(new URL(a).hostname).registrableDomain;
+      return d !== here && !isIdentityProvider(d);
+    } catch { return false; }
+  });
+};
 
 /** What a conclusion gets to look at: the evidence, and what already fired. */
 export interface ConclusionContext {
@@ -99,17 +119,22 @@ const confirmedByIntelligence: ConclusionRule = ({ signals }) => {
  */
 const brandCredentialHarvest: ConclusionRule = ({ evidence: e }) => {
   const dom = e.dom;
-  if (!dom?.hasPasswordField) return null;
-  if (dom.brandTokens.length === 0) return null;
+  if (!dom || !asksForSecret(e)) return null;
+  const claim = falseClaims(e)[0];
+  if (!claim) return null;
 
   const { registrableDomain } = parseHost(e.hostname);
   if (BRAND_DOMAINS.has(registrableDomain)) return null;
+  // A top-10k site naming another brand is, overwhelmingly, a partner or a
+  // social sign-in. It only becomes this conclusion if the password leaves.
+  if (isWellKnown(registrableDomain) && !postsToStranger(e)) return null;
 
-  const brand = brandName(dom.brandTokens[0] ?? '');
+  const brand = brandName(claim.brand);
   const because = ['compound_impersonation_credential_form'];
+  const what = dom.asksSeedPhrase ? 'wallet recovery phrase' : dom.asksCard && !dom.hasPasswordField ? 'card details' : `${brand} password`;
 
   // Posting the password to a third party removes the last doubt.
-  if (dom.crossOriginPasswordForm) {
+  if (postsToStranger(e)) {
     because.push('cross_origin_password_form');
     return {
       id: 'credential_theft',
@@ -120,10 +145,21 @@ const brandCredentialHarvest: ConclusionRule = ({ evidence: e }) => {
     };
   }
 
+  if (claim.how === 'fingerprint') {
+    because.push('copied_sign_in_page');
+    return {
+      id: 'copied_sign_in_page',
+      title: `This is a copy of ${brand}'s sign-in page`,
+      detail: `The page is built exactly like ${brand}'s own sign-in page, but it is on ${registrableDomain}. Anything you type goes to whoever runs ${registrableDomain}, not to ${brand}.`,
+      floor: 'danger',
+      because,
+    };
+  }
+
   return {
     id: 'brand_impersonation_login',
     title: `A ${brand} sign-in page on a domain ${brand} does not own`,
-    detail: `${registrableDomain} is asking for ${brand} credentials. Whoever receives them will not be ${brand}.`,
+    detail: `${registrableDomain} is asking for your ${what}. Whoever receives it will not be ${brand}.`,
     floor: 'danger',
     because,
   };
@@ -143,9 +179,9 @@ const brandCredentialHarvest: ConclusionRule = ({ evidence: e }) => {
 const freshDomainCredentialForm: ConclusionRule = ({ evidence: e }) => {
   const age = e.domainAgeDays;
   if (age === undefined || age === null || age > 30) return null;
-  if (!e.dom?.hasPasswordField) return null;
+  if (!e.dom || !asksForPassword(e)) return null;
 
-  const floor: Band = e.dom.crossOriginPasswordForm || e.dom.brandTokens.length > 0
+  const floor: Band = postsToStranger(e) || e.dom.brandTokens.length > 0
     ? 'danger'
     : 'suspicious';
 
@@ -168,8 +204,10 @@ const freshDomainCredentialForm: ConclusionRule = ({ evidence: e }) => {
  */
 const passwordLeavesTheSite: ConclusionRule = ({ evidence: e }) => {
   const dom = e.dom;
-  if (!dom?.hasPasswordField || !dom.crossOriginPasswordForm) return null;
-  if (dom.brandTokens.length > 0) return null; // covered, more strongly, above
+  // No visibility test here: a password form wired to a stranger is the
+  // attack whether or not it has been revealed yet.
+  if (!dom?.hasPasswordField || !postsToStranger(e)) return null;
+  if (dom.brandTokens.length > 0 && asksForPassword(e)) return null; // covered, more strongly, above
 
   const target = dom.passwordFormActions[0];
   let where = 'another site';
@@ -195,7 +233,7 @@ const passwordLeavesTheSite: ConclusionRule = ({ evidence: e }) => {
  */
 const passwordOverPlainHttp: ConclusionRule = ({ evidence: e }) => {
   const dom = e.dom;
-  if (!dom?.hasPasswordField) return null;
+  if (!dom || !asksForPassword(e)) return null;
   if (!dom.insecurePasswordFormAction && e.protocol !== 'http:') return null;
   return {
     id: 'password_in_the_clear',
@@ -206,6 +244,64 @@ const passwordOverPlainHttp: ConclusionRule = ({ evidence: e }) => {
   };
 };
 
+/**
+ * A page dressed as a brand, on an address with a second tell, but no login
+ * form (yet). Fake Roblox profiles, fake "update Adobe" PDF viewers, crypto
+ * giveaways. Held at `suspicious`: enough for Iris to speak, with a reason she
+ * can say in one sentence.
+ */
+const brandLookalikePage: ConclusionRule = ({ evidence: e, fired }) => {
+  const dom = e.dom;
+  const claim = falseClaims(e)[0];
+  if (!dom || !claim) return null;
+  const { registrableDomain } = parseHost(e.hostname);
+  if (BRAND_DOMAINS.has(registrableDomain) || isWellKnown(registrableDomain)) return null;
+  const young = e.domainAgeDays !== undefined && e.domainAgeDays !== null && e.domainAgeDays <= 30;
+  const tells = ['hotlinked_brand_favicon', 'brand_in_subdomain', 'brand_typosquat', 'brand_confusable_domain',
+    'brand_on_foreign_tld', 'document_lure', 'borrowed_brand_logo', 'copied_sign_in_page', 'wordpress_internal_path',
+    'wordpress_upload_path', 'free_hosting_subdomain']
+    .filter((id) => fired.has(id));
+  if (!young && tells.length === 0) return null;
+  const brand = brandName(claim.brand);
+  return {
+    id: 'brand_lookalike_page',
+    title: `This page is dressed up as ${brand}, but it is not ${brand}`,
+    detail: young
+      ? `It uses ${brand} branding on ${registrableDomain}, a domain registered ${e.domainAgeDays} days ago. ${brand} does not use it.`
+      : `It uses ${brand} branding on ${registrableDomain}, a site ${brand} does not own, and it shows other signs of a fake: ${tells.length} of them.`,
+    floor: 'suspicious',
+    because: ['brand_content_mismatch', ...tells],
+  };
+};
+
+/** One-signal conclusions: offline evidence specific enough to name the attack. */
+const namedAttack = (signalId: string, id: string, title: string, floor: Band): ConclusionRule =>
+  ({ signals }) => {
+    const s = signals.find((x) => x.id === signalId);
+    if (!s) return null;
+    return { id, title, detail: s.detail, floor, because: [signalId] };
+  };
+
+const clickFixAttack = namedAttack('clickfix_command', 'clickfix_attack', 'This page is trying to make you run a command', 'danger');
+const seedPhraseTheft = namedAttack('seed_phrase_request', 'seed_phrase_theft', 'This page wants your crypto recovery phrase', 'danger');
+const secretToRelay = namedAttack('secret_sent_to_relay', 'secret_to_relay', 'What you type here goes to a stranger', 'danger');
+const techSupportScam = namedAttack('fake_virus_warning', 'tech_support_scam', 'This is a fake virus warning', 'danger');
+const fakePopup = namedAttack('fake_popup_window', 'browser_in_browser', 'That sign-in window is fake', 'danger');
+
+/** On the local list. Danger when the page is also asking for something or claiming a brand. */
+const onLocalBlocklist: ConclusionRule = ({ evidence: e, signals }) => {
+  const s = signals.find((x) => x.id === 'local_blocklist_match');
+  if (!s) return null;
+  const serious = asksForSecret(e) || falseClaims(e).length > 0;
+  return {
+    id: 'local_blocklist',
+    title: 'This site is on a list of phishing sites',
+    detail: s.detail,
+    floor: serious ? 'danger' : 'suspicious',
+    because: ['local_blocklist_match'],
+  };
+};
+
 /** Order matters only for display; the floor is the maximum across all of them. */
 const CONCLUSION_RULES: ConclusionRule[] = [
   confirmedByIntelligence,
@@ -213,6 +309,13 @@ const CONCLUSION_RULES: ConclusionRule[] = [
   passwordLeavesTheSite,
   freshDomainCredentialForm,
   passwordOverPlainHttp,
+  brandLookalikePage,
+  onLocalBlocklist,
+  clickFixAttack,
+  seedPhraseTheft,
+  secretToRelay,
+  techSupportScam,
+  fakePopup,
 ];
 
 export function concludeFrom(evidence: PageEvidence, signals: Signal[]): Conclusion[] {

@@ -14,6 +14,7 @@ import {
   BRAND_DOMAINS, BRAND_TOKENS, domainsForToken,
   CHEAP_ABUSE_TLDS, FREE_TLDS, isWellKnown, RISKY_DOWNLOAD_EXTENSIONS, URL_SHORTENERS,
 } from '../data/index.js';
+import { AMBIGUOUS_TOKENS, words } from '../brandText.js';
 
 /**
  * Lookalike rules are suppressed for domains that are themselves well known.
@@ -83,6 +84,26 @@ export const homographHost: Rule = (e) => {
 };
 
 /**
+ * Domains worth checking for near-misses: a brand's own name domain
+ * (paypal.com for "paypal"), and never an ordinary word. v3 compared against
+ * every domain on the brand list, so "force" (force.com) and "steam" made
+ * forge.com and steal.com look like typosquats.
+ */
+// Names built from a common word ("ubank", "citibank", "wetransfer",
+// "aliexpress") sit one letter from other real companies: mbank.pl, isbank.com.tr,
+// icicibank.com, wmtransfer.com, lexpress.fr. Those brands are still caught on
+// the page itself; only the address-spelling rule skips them. The few kept are
+// the ones most typosquatted in Australia.
+const GENERIC_PART = /bank|transfer|express|link|post|pay|mail|card|wallet|shop|air|net/;
+const TYPOSQUAT_KEEP = new Set(['paypal', 'commbank', 'auspost', 'gmail', 'afterpay', 'scotiabank', 'bankofamerica', 'bankwest']);
+
+const TYPOSQUAT_TARGETS: string[] = [...BRAND_DOMAINS].filter((d) => {
+  const sld = d.split('.')[0]!;
+  if (!BRAND_TOKENS.includes(sld) || AMBIGUOUS_TOKENS.has(sld)) return false;
+  return TYPOSQUAT_KEEP.has(sld) || !GENERIC_PART.test(sld);
+});
+
+/**
  * Typosquatting: the registrable domain is within two edits of a known brand
  * domain but is not that domain. Confusable characters are folded first so
  * `paypa1.com` and `pаypal.com` both land on `paypal.com`.
@@ -101,7 +122,7 @@ export const brandTyposquat: Rule = (e) => {
 
   const allowedDistance = foldedSld.length >= 8 ? 2 : 1;
 
-  for (const brandDomain of BRAND_DOMAINS) {
+  for (const brandDomain of TYPOSQUAT_TARGETS) {
     const brandSld = brandDomain.split('.')[0]!;
     if (brandSld.length < 5) continue;
     if (Math.abs(brandSld.length - foldedSld.length) > allowedDistance) continue;
@@ -138,17 +159,34 @@ export const brandOutsideRegistrable: Rule = (e) => {
   if (isIpLiteral) return null;
   if (BRAND_DOMAINS.has(registrableDomain)) return null;
 
-  const subdomainText = subdomains.join('.').toLowerCase();
-  const pathText = e.path.toLowerCase();
+  // Whole words only. v3 used substring search, so "purchase" read as Chase,
+  // "permit" as RMIT and "booking.myclinic.com.au" as Booking.com.
+  const subWords = words(subdomains.join(' '));
+  const subGrams = new Set([...subWords, ...subWords.slice(1).map((w, i) => subWords[i] + w)]);
+  const pathWords = new Set(words(e.path));
+  const subdomainText = { includes: (t: string) => subGrams.has(t) || subdomains.some((l) => l.startsWith(t + '-') || l === t) };
+  const pathText = { includes: (t: string) => pathWords.has(t) && !AMBIGUOUS_TOKENS.has(t) };
 
   for (const token of BRAND_TOKENS) {
     if (token.length < 4) continue;
     const legit = domainsForToken(token);
     if (legit.includes(registrableDomain)) continue;
+    if (AMBIGUOUS_TOKENS.has(token) && isTrustedName(registrableDomain)) continue;
 
     // In the hostname: whoever owns the registrable domain chose to put a brand
     // name in front of it. That is deliberate and almost always impersonation.
+    // Ambiguous words ("booking", "zoom", "canvas") are ordinary subdomain names
+    // and only count at a third of the weight.
     if (subdomainText.includes(token)) {
+      if (AMBIGUOUS_TOKENS.has(token)) {
+        return sig({
+          id: 'brand_word_in_subdomain',
+          title: `Hostname starts with "${token}"`,
+          detail: `"${token}" is in the hostname but the site owner is ${registrableDomain}. It is also an ordinary word, so this is weak on its own.`,
+          tier: 'url',
+          weight: 8,
+        });
+      }
       return sig({
         id: 'brand_in_subdomain',
         title: `Says "${token}" but the site owner is ${registrableDomain}`,
@@ -406,6 +444,9 @@ export const generatedPathSegment: Rule = (e) => {
   // this signal carries no information at all, and firing it there is how a
   // phishing detector loses the user's trust.
   if (isTrustedName(parseHost(e.hostname).registrableDomain)) return null;
+  // A domain that has existed for a year is not throwaway kit infrastructure,
+  // and opaque ids are how every web app addresses its documents.
+  if ((e.domainAgeDays ?? 0) >= 365) return null;
 
   const segments = e.path.split('/').filter(Boolean);
   for (const raw of segments) {

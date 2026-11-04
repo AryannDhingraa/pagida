@@ -124,7 +124,8 @@ function buildOnboarding(): void {
       title: 'What I actually check',
       render: () => stepBody(
         '<b>The address.</b> Is this pretending to be a brand it is not? Is the name one letter off a real one? Was it made up last week?',
-        '<b>The page.</b> Does the login box send your password to a different website? Is this a copy of a real page with the buttons removed?',
+        '<b>The page.</b> Is this a copy of a real sign-in page? Does it send what you type to a stranger? Is it asking for a card, a code or a crypto recovery phrase it has no business asking for?',
+        '<b>Tricks.</b> A fake CAPTCHA that copies a command for you to paste, a fake virus warning with a phone number, a fake pop-up window. I stop the command from working and tell you why.',
         '<b>Its history.</b> Is it already on a public list of known scams? How long has it really existed?',
         'Everything I find gets a score, and every point traces back to one thing I can name. You can disagree with any of it.',
       ),

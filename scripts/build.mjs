@@ -15,7 +15,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const outdir = resolve(root, 'dist');
+const outdir = resolve(root, process.env.OUTDIR || 'dist');
 const watch = process.argv.includes('--watch');
 
 const pkg = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'));
@@ -24,6 +24,7 @@ const pkg = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'));
 const bundles = [
   { in: 'src/background/index.ts', out: 'background', format: 'esm' },
   { in: 'src/content/index.ts', out: 'content', format: 'iife' },
+  { in: 'src/content/clipboard-main.ts', out: 'clipboard', format: 'iife' },
   { in: 'src/popup/popup.ts', out: 'popup', format: 'iife' },
   { in: 'src/options/options.ts', out: 'options', format: 'iife' },
   { in: 'src/report/report.ts', out: 'report', format: 'iife' },

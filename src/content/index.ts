@@ -12,6 +12,7 @@
  * and never more than a handful of times per page.
  */
 import { extractDomEvidence, extractTechFacts } from './extract.js';
+import { noteClipboard } from './offline.js';
 import { hideCompanion, showCompanion } from './companion.js';
 import { evidenceSignature } from '../core/evidence.js';
 import type { Message } from '../shared/messages.js';
@@ -49,9 +50,17 @@ function schedule(delay = SETTLE_MS, force = false): void {
   timer = setTimeout(() => report(force), delay);
 }
 
-// Initial pass once the page has had a moment to render.
-if (document.readyState === 'complete') schedule(150);
-else window.addEventListener('load', () => schedule(150), { once: true });
+// Initial pass once the page has had a moment to render, then two late looks:
+// cloned Microsoft and Google sign-in pages fade their form in after a loading
+// animation, and the first look sees it hidden. The signature check drops
+// these when nothing changed, so a normal page still reports once.
+function initialPasses(): void {
+  schedule(150);
+  setTimeout(() => { if (timer === undefined) report(); }, 1800);
+  setTimeout(() => { if (timer === undefined) report(); }, 4500);
+}
+if (document.readyState === 'complete') initialPasses();
+else window.addEventListener('load', initialPasses, { once: true });
 
 /**
  * Catch two things only: a single-page-app navigation, and a credential form
@@ -77,6 +86,16 @@ const observer = new MutationObserver(() => {
 if (document.documentElement) {
   observer.observe(document.documentElement, { childList: true, subtree: true });
 }
+
+// The clipboard watcher in the page's own world reports here when a page puts
+// a command on the clipboard. Re-score at once: this is the moment that matters.
+window.addEventListener('message', (e: MessageEvent) => {
+  if (e.source !== window) return;
+  const d = e.data as { source?: string; text?: unknown } | null;
+  if (!d || d.source !== 'pagida-clipboard' || typeof d.text !== 'string') return;
+  noteClipboard(d.text);
+  report(true);
+});
 
 chrome.runtime.onMessage.addListener((msg: Message, _sender, sendResponse) => {
   if (msg.type === 'SHOW_COMPANION') {

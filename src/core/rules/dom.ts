@@ -67,7 +67,7 @@ export const brandContentMismatch: Rule = (e) => {
   const tokens = e.dom?.brandTokens ?? [];
   if (tokens.length === 0) return null;
   const { registrableDomain } = parseHost(e.hostname);
-  if (BRAND_DOMAINS.has(registrableDomain)) return null;
+  if (isTrustedName(registrableDomain)) return null;
 
   for (const token of tokens) {
     const legit = domainsForToken(token);
@@ -77,7 +77,7 @@ export const brandContentMismatch: Rule = (e) => {
       title: `Page presents itself as ${token}`,
       detail: `This page uses ${token} branding, but it is hosted on ${registrableDomain}. ${token} pages are served from ${legit.slice(0, 2).join(' or ')}.`,
       tier: 'dom',
-      weight: e.dom?.hasPasswordField ? 24 : 16,
+      weight: e.dom?.hasPasswordField && e.dom.passwordFieldVisible !== false ? 24 : 16,
     });
   }
   return null;
@@ -132,6 +132,8 @@ export const antiAnalysisBehaviour: Rule = (e) => {
 /** Hidden iframes — overlay and clickjacking technique. */
 export const hiddenIframes: Rule = (e) => {
   if (isTrustedName(parseHost(e.hostname).registrableDomain)) return null;
+  // Only interesting next to a sign-in form; on its own it is ad tech.
+  if (!e.dom?.hasPasswordField) return null;
   const n = e.dom?.hiddenIframeCount ?? 0;
   if (n < 1) return null;
   return sig({
@@ -162,7 +164,8 @@ export const obfuscatedScripts: Rule = (e) => {
 /** A login page whose navigation goes nowhere — a single-page kit. */
 export const deadNavigation: Rule = (e) => {
   const d = e.dom;
-  if (!d?.hasPasswordField) return null;
+  if (!d?.hasPasswordField || d.passwordFieldVisible === false) return null;
+  if (isTrustedName(parseHost(e.hostname).registrableDomain)) return null;
   if (d.linkCount < 5) return null;
   if (d.deadLinkRatio < 0.8) return null;
   return sig({

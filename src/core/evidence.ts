@@ -70,5 +70,12 @@ export function evidenceSignature(url: string, dom: DomEvidence): string {
     dom.contextMenuBlocked ? 1 : 0,
     Math.round(dom.obfuscationScore * 20),
     Math.round(dom.deadLinkRatio * 20),
+    (dom.loginFingerprints ?? []).join(','),
+    (dom.brandAssets ?? []).join(','),
+    dom.asksCard ? 1 : 0, dom.asksOneTimeCode ? 1 : 0, dom.asksSeedPhrase ? 1 : 0,
+    dom.exfilTarget ?? '', dom.botExfil ? 1 : 0,
+    dom.clickFix ? 1 : 0, dom.clipboardCommand ? 1 : 0,
+    dom.techSupportScam ? 1 : 0, dom.documentLure ? 1 : 0, dom.cryptoLure ? 1 : 0,
+    dom.fakeAddressBar ?? '', dom.passwordFieldVisible ? 1 : 0,
   ].join('~');
 }

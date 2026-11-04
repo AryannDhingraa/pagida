@@ -1,19 +1,21 @@
 # Privacy Policy
 
 **Pagida — Phishing Detector**
-Last updated: 23 August 2026 (version 2.1.1)
+Last updated: 4 November 2026 (version 5.0.0)
 
 ## The short version
 
 Pagida has no account, no analytics, no telemetry, no advertising, and sells
 nothing. Scoring happens on your computer.
 
-There is now **one** server involved, and this policy will not bury it: Pagida
-runs a small proxy so that everyone gets the key-gated threat list for free
-without registering for anything. It receives **a domain name** — `example.com`
-— and never the address of the page you are on. It stores nothing. It is a
-single switch on the options page, and turning it off costs you one signal out
-of twenty-two, not the product.
+Since version 5 Pagida works offline first: its checks, both scam lists and
+its logo matching all run on your computer. There is **one** server involved,
+and this policy will not bury it: a small proxy that asks Google's threat list
+about a site. It receives **a domain name** — `example.com` — and never the
+address of the page you are on. It is only asked about sites that are not among
+the world's 10,000 best known, at most once a day per site, and never about
+your own network (routers, `localhost`, `.local`, intranet names). It stores
+nothing about you. Turning it off leaves Pagida fully working, offline.
 
 Everything below is the long version, source by source.
 
@@ -28,7 +30,8 @@ browser profile, and nowhere else.
 | Marked sites | Hostnames you explicitly reported as phishing or marked as safe |
 | Install id | A random string this browser generates for itself, used only as a quota counter for the service below. Not an account, not linked to you, never sent anywhere else |
 | Domain-age cache | Registrable domains and their registration age, kept for 7 days |
-| Blocklist | A copy of the public OpenPhish feed, refreshed every 12 hours |
+| Blocklists | A copy of the public OpenPhish feed, refreshed every 12 hours, and a fingerprinted copy of Phishing.Database's active phishing domains (about 3 MB, in IndexedDB), refreshed daily |
+| Lookup memory | For up to 3,000 sites: the fact that Google's list had nothing on them, and when. Kept for 24 hours (1 hour on shared hosts like github.io), so the proxy is not asked again |
 | Counters | Three numbers: pages checked, warnings raised, sites you reported |
 
 Pagida deliberately does **not** use `chrome.storage.sync`. Sync would push
@@ -74,11 +77,21 @@ record, so the request may end at Verisign, Nominet, or another registry.
 - Requests time out after four seconds and failure is silent.
 - Switch it off: Options → What I look up → *Check how old a domain is*.
 
-### 3. Blocklist download — `raw.githubusercontent.com` (on by default)
+### 3. Blocklist downloads — `raw.githubusercontent.com` (on by default)
 
 Pagida downloads the [OpenPhish community feed](https://github.com/openphish/public_feed)
-every 12 hours. This is a plain file download of a public list. The matching
-then happens entirely on your machine — **the pages you visit are never sent**.
+every 12 hours and the [Phishing.Database](https://github.com/Phishing-Database/Phishing.Database)
+active-domain list (MIT licence, about 3.7 MB) once a day. These are plain file
+downloads of public lists. The matching then happens entirely on your machine —
+**the pages you visit are never sent**.
+
+### 3b. Favicon check — the site you are already on
+
+On a site that is not well known and is asking for a password, a card, a code
+or a recovery phrase, Pagida fetches that page's own tab icon once more (with no
+cookies and no referrer) to compare its fingerprint against the icons of
+commonly impersonated brands. The request goes only to the site you are already
+visiting, for a file your browser has already loaded.
 
 Switch it off: Options → What I look up → *The community scam list*.
 

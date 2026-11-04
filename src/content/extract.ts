@@ -9,7 +9,8 @@
 import type { DomEvidence } from '../core/types.js';
 import { parseHost } from '../core/util/domain.js';
 import type { TechFacts } from '../services/report.js';
-import { BRAND_TOKENS } from '../core/data/brands.js';
+import { identityBrands } from '../core/brandText.js';
+import { extractOffline } from './offline.js';
 
 const OBFUSCATION_MARKERS = [
   /\beval\s*\(/g,
@@ -35,6 +36,22 @@ function analysePasswordForms() {
     document.querySelectorAll<HTMLInputElement>('input[type="password"]'),
   );
   const hasPasswordField = passwordInputs.length > 0;
+  // A login box hidden in a closed modal is not a page asking for a password.
+  // But a two-step sign-in (Google, Microsoft, and every kit that clones them)
+  // shows the email box first and keeps the password box hidden until "Next",
+  // so a visible username/email box next to a password box counts too.
+  // Same form only: a newsletter email box in the footer does not make a
+  // closed login modal visible.
+  const ID_HINT = /user|mail|login|ident|account|phone|signin/i;
+  const identifierVisible = passwordInputs.some((pw) => {
+    const scope: ParentNode | null = pw.form ?? pw.closest('[role="dialog"], section, main') ?? document.body;
+    if (!scope) return false;
+    return Array.from(scope.querySelectorAll<HTMLInputElement>(
+      'input[type="email"], input[type="text"], input[type="tel"], input:not([type])',
+    )).some((i) => isVisible(i) && ID_HINT.test(
+      `${i.name} ${i.id} ${i.autocomplete} ${i.getAttribute('aria-label') ?? ''} ${i.placeholder} ${i.type}`));
+  });
+  const passwordFieldVisible = passwordInputs.some(isVisible) || identifierVisible;
 
   const actions = new Set<string>();
   let crossOrigin = false;
@@ -62,6 +79,7 @@ function analysePasswordForms() {
 
   return {
     hasPasswordField,
+    passwordFieldVisible,
     passwordFormActions: [...actions],
     crossOriginPasswordForm: crossOrigin,
     insecurePasswordFormAction: insecure,
@@ -70,9 +88,30 @@ function analysePasswordForms() {
 }
 
 /** Frames that are present but cannot be seen. */
+/** Invisible by design: bot checks, tag managers, payment and chat widgets. */
+const BENIGN_FRAME_DOMAINS = new Set([
+  'google.com', 'googletagmanager.com', 'doubleclick.net', 'googlesyndication.com', 'gstatic.com',
+  'recaptcha.net', 'hcaptcha.com', 'cloudflare.com', 'challenges.cloudflare.com', 'stripe.com',
+  'stripe.network', 'paypal.com', 'braintreegateway.com', 'adyen.com', 'facebook.com', 'facebook.net',
+  'twitter.com', 'linkedin.com', 'hotjar.com', 'intercom.io', 'intercomcdn.com', 'zendesk.com',
+  'youtube.com', 'vimeo.com', 'bing.com', 'clarity.ms', 'tiktok.com', 'pinterest.com', 'criteo.com',
+  'adnxs.com', 'amazon-adsystem.com', 'appsflyer.com', 'branch.io', 'segment.com', 'optimizely.com',
+  'onetrust.com', 'cookielaw.org', 'arkoselabs.com', 'funcaptcha.com', 'datadome.co', 'px-cloud.net',
+  'perimeterx.net', 'akamaihd.net', 'demdex.net', 'everesttech.net', 'rlcdn.com', 'afterpay.com',
+  'zip.co', 'klarna.com', 'shopify.com', 'apple.com', 'microsoft.com', 'live.com', 'okta.com', 'auth0.com',
+]);
+
 function countHiddenIframes(): number {
   let n = 0;
   for (const frame of Array.from(document.querySelectorAll('iframe'))) {
+    // Same-site and blank frames are the page's own plumbing; known widgets are
+    // hidden on purpose. Only an unexplained third-party frame is interesting.
+    const src = frame.getAttribute('src') ?? '';
+    if (!src || src.startsWith('about:') || src.startsWith('javascript:')) continue;
+    const host = hostOf(src);
+    if (!host) continue;
+    const reg = parseHost(host).registrableDomain;
+    if (reg === pageDomain() || BENIGN_FRAME_DOMAINS.has(reg)) continue;
     const style = getComputedStyle(frame);
     const rect = frame.getBoundingClientRect();
     const invisible =
@@ -86,20 +125,63 @@ function countHiddenIframes(): number {
   return n;
 }
 
-/** Brand names visible in the page's own description of itself. */
+/** True when an element is actually rendered and has some size. */
+function isVisible(el: Element): boolean {
+  const r = (el as HTMLElement).getBoundingClientRect();
+  if (r.width < 2 || r.height < 2) return false;
+  const st = getComputedStyle(el);
+  return st.display !== 'none' && st.visibility !== 'hidden' && Number(st.opacity) > 0.05;
+}
+
+/**
+ * The brands this page presents itself AS — not every brand it mentions.
+ * See src/core/brandText.ts for why v3's version flagged Figma as Google.
+ */
 function detectBrandTokens(): string[] {
-  const parts: string[] = [
+  const meta = (sel: string) => document.querySelector(sel)?.getAttribute('content') ?? '';
+  const selfName = [
     document.title,
-    document.querySelector('meta[name="description"]')?.getAttribute('content') ?? '',
-    document.querySelector('meta[property="og:site_name"]')?.getAttribute('content') ?? '',
-    ...Array.from(document.querySelectorAll('h1, h2')).slice(0, 10).map((h) => h.textContent ?? ''),
-    ...Array.from(document.querySelectorAll('img[alt]')).slice(0, 30)
-      .map((i) => i.getAttribute('alt') ?? ''),
-    ...Array.from(document.querySelectorAll('button, input[type="submit"]')).slice(0, 20)
-      .map((b) => b.textContent ?? (b as HTMLInputElement).value ?? ''),
+    meta('meta[property="og:site_name"]'),
+    meta('meta[name="application-name"]'),
   ];
-  const haystack = parts.join(' ').toLowerCase().replace(/[^a-z0-9]+/g, '');
-  return BRAND_TOKENS.filter((t) => t.length >= 4 && haystack.includes(t)).slice(0, 5);
+
+  const headings = Array.from(document.querySelectorAll('h1')).slice(0, 3)
+    .filter(isVisible).map((h) => h.textContent ?? '');
+  // The heading or legend closest above a visible password box: "Sign in to PayPal".
+  const pw = Array.from(document.querySelectorAll('input[type="password"]')).find(isVisible);
+  const container = pw?.closest('form, [role="dialog"], main, section, div');
+  if (container) {
+    const h = container.querySelector('h1, h2, h3, legend, [role="heading"]');
+    if (h?.textContent) headings.push(h.textContent);
+  }
+
+  const logos = Array.from(document.querySelectorAll<HTMLImageElement>('img[alt], svg[aria-label]'))
+    .filter((el) => {
+      const alt = (el.getAttribute('alt') ?? el.getAttribute('aria-label') ?? '').toLowerCase();
+      const cls = `${el.getAttribute('class') ?? ''} ${el.id}`.toLowerCase();
+      const inHeader = !!el.closest('header, [role="banner"], nav');
+      const inForm = !!(container && container.contains(el));
+      // Icons on social sign-in buttons ("GitHub" on Render's login) are a
+      // third party's mark, not the page's own logo.
+      const control = el.closest('button, [role="button"], a');
+      if (control && (control.tagName !== 'A'
+        || /continue|sign|log|with|connect|join|register/i.test(control.textContent ?? ''))) return false;
+      // A logo that links off-site is someone else's: the social icons in a
+      // header ("Instagram", "Facebook") or a partner badge. A page's own logo
+      // links back to its own home page.
+      // Only small icons, though: a copied sign-in page often links a full-size
+      // brand logo back to the real brand's site, and that one should count.
+      if (control?.tagName === 'A') {
+        const host = hostOf((control as HTMLAnchorElement).href);
+        const r = el.getBoundingClientRect();
+        if (host && parseHost(host).registrableDomain !== pageDomain() && r.width <= 48 && r.height <= 48) return false;
+      }
+      return alt.length > 0 && (alt.includes('logo') || cls.includes('logo') || inHeader || inForm);
+    })
+    .slice(0, 6)
+    .map((el) => el.getAttribute('alt') ?? el.getAttribute('aria-label') ?? '');
+
+  return identityBrands({ selfName, headings, logos });
 }
 
 /** Where the favicon comes from, and whether that is somewhere else. */
@@ -121,7 +203,10 @@ function faviconOrigin(): { external: boolean; host?: string } {
 
 /** How much of the inline script looks deliberately encoded. */
 function obfuscationScore(): number {
-  const scripts = Array.from(document.querySelectorAll('script:not([src])'))
+  // JSON data islands (Next.js __NEXT_DATA__, JSON-LD, import maps) are full of
+  // \u00xx escapes by design. v3 counted them as obfuscated code.
+  const scripts = Array.from(document.querySelectorAll<HTMLScriptElement>('script:not([src])'))
+    .filter((s) => !s.type || /^(?:text|application)\/(?:javascript|ecmascript)$|^module$/i.test(s.type))
     .map((s) => s.textContent ?? '')
     .join('\n')
     .slice(0, 200_000); // cap the work on huge pages
@@ -168,6 +253,7 @@ export function extractDomEvidence(): DomEvidence {
     contextMenuBlocked: contextMenuBlocked(),
     obfuscationScore: obfuscationScore(),
     ...nav,
+    ...extractOffline(),
   };
 }
 

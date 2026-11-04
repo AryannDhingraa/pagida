@@ -13,6 +13,7 @@
  * working with no keys, no network, and no consent to look anything up.
  */
 import type { Rule, Signal } from '../types.js';
+import { asksForSecret } from '../identity.js';
 
 const sig = (s: Signal): Signal => s;
 
@@ -24,6 +25,11 @@ export const newlyRegisteredDomain: Rule = (e) => {
   const age = e.domainAgeDays;
   if (age === undefined || age === null) return null;
   if (age > 90) return null;
+  // A 1-3 month old domain matters most when it is asking for something, so a
+  // quiet page gets half the weight there. Under a month keeps full weight:
+  // phishing landing pages often ask for nothing on the first screen.
+  const quiet = e.dom !== undefined && !asksForSecret(e) && (e.dom.brandTokens?.length ?? 0) === 0;
+  const scale = (w: number) => (quiet ? Math.round(w / 2) : w);
 
   if (age <= 7) {
     return sig({
@@ -48,7 +54,7 @@ export const newlyRegisteredDomain: Rule = (e) => {
     title: `Domain registered ${age} days ago`,
     detail: 'This domain is fairly new. Not unusual on its own, but worth knowing.',
     tier: 'reputation',
-    weight: 12,
+    weight: scale(12),
   });
 };
 
@@ -142,7 +148,25 @@ const THREAT_WORDS: Record<string, string> = {
   UNWANTED_SOFTWARE: 'a site that pushes unwanted software',
 };
 
+/**
+ * The big local list. Community-maintained and not perfect (it once listed
+ * Netflix's video servers), so it is `correlated`, not `confirmed`: strong,
+ * but a person's own "this is safe" can still overrule it.
+ */
+export const blocklistMatch: Rule = (e) => {
+  if (!e.blocklistHit || e.feedUrlHit || e.feedHostHit) return null;
+  return sig({
+    id: 'local_blocklist_match',
+    title: 'On a public list of phishing sites',
+    detail: 'This domain is on Phishing.Database, a public list of active phishing sites that Pagida keeps on your computer and checks without sending anything anywhere.',
+    tier: 'reputation',
+    weight: 50,
+    certainty: 'correlated',
+  });
+};
+
 export const REPUTATION_RULES: Rule[] = [
+  blocklistMatch,
   newlyRegisteredDomain,
   establishedDomain,
   feedUrlMatch,

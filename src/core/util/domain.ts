@@ -24,6 +24,24 @@ import { PSL_RULES, PSL_WILDCARDS, PSL_EXCEPTIONS } from '../data/psl.js';
 // Split once, at module load. Around a millisecond, and every lookup after
 // that is a hash probe.
 const RULES = new Set(PSL_RULES.split('\n'));
+
+/**
+ * Free hosting and site builders where every subdomain is a different person,
+ * but which are missing from the Public Suffix List. Treated as suffixes, so
+ * `someone.wordpress.com` is its own site rather than "wordpress.com, a top
+ * 10,000 domain". v4 missed a Netflix kit on a HostGator Brazil site builder
+ * subdomain because of exactly this: the builder's own domain is in the top 10,000.
+ */
+const EXTRA_TENANT_SUFFIXES = [
+  'wordpress.com', 'wpcomstaging.com', 'weebly.com', 'weeblysite.com', 'meusitehostgator.com.br',
+  'godaddysites.com', 'mystrikingly.com', 'jimdosite.com', 'site123.me', 'tilda.ws', 'webnode.page',
+  'square.site', '000webhostapp.com', 'ucoz.net', 'hostingersite.com', 'byethost.com', 'rf.gd',
+  'infinityfreeapp.com', 'epizy.com', 'ct.ws', 'kesug.com', 'wuaze.com', 'freewebhostmost.com',
+  'criarsite.online', 'simdif.com', 'sitey.me', 'mozello.com', 'bravesites.com', 'hpage.com',
+  'serveo.net', 'edgeone.dev', 'edgeone.app', 'surge.sh', 'railway.app', 'up.railway.app',
+  'codeanyapp.com', 'super.site', 'bubbleapps.io', 'softr.app', 'durable.co',
+];
+for (const s of EXTRA_TENANT_SUFFIXES) RULES.add(s);
 const WILDCARDS = new Set(PSL_WILDCARDS.split('\n'));
 const EXCEPTIONS = new Set(PSL_EXCEPTIONS.split('\n'));
 

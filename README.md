@@ -7,19 +7,19 @@
 **A phishing detector for Chrome that shows its working.**
 
 Iris checks every page you open and tells you, in a sentence, whether to trust
-it — then shows you every single reason behind that answer. No machine-learning
-black box, no account, no tracking. Scoring happens on your machine; the only
-thing that ever leaves it is a domain name.
+it — then shows you every single reason behind that answer. No account, no
+tracking. Since v5 the whole engine runs offline on your machine: copied
+sign-in pages, fake CAPTCHAs that try to make you run a command, fake virus
+warnings and recovery-phrase thieves are all caught without asking a server.
 
 [![CI](https://github.com/AryannDhingraa/pagida/actions/workflows/ci.yml/badge.svg)](https://github.com/AryannDhingraa/pagida/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Manifest V3](https://img.shields.io/badge/manifest-v3-blue.svg)](src/manifest.json)
-[![Tests](https://img.shields.io/badge/tests-87%20passing-brightgreen.svg)](test)
+[![Tests](https://img.shields.io/badge/tests-168%20passing-brightgreen.svg)](test)
 
 *παγίδα — Greek for "trap".*
 
-**Coming to the Chrome Web Store.** Until then, [grab the latest release](https://github.com/AryannDhingraa/pagida/releases)
-and load it unpacked — [three steps, below](#install).
+**[Install from the Chrome Web Store](https://chromewebstore.google.com/detail/bcjboonbeegdjfcgijbbeccpcighafll)** · [What changed in v5](CHANGELOG.md)
 
 </div>
 
@@ -79,7 +79,7 @@ someone judge a site for themselves.
 
 ## Install
 
-**From the Chrome Web Store** — *listing pending review, link goes here.*
+**From the Chrome Web Store** — [Pagida on the Chrome Web Store](https://chromewebstore.google.com/detail/bcjboonbeegdjfcgijbbeccpcighafll).
 
 **From source:**
 
@@ -351,7 +351,7 @@ blind spots is worse than one that has them.
 - [ ] **Measure the whole engine, not just the URL tier** — an archived page
       corpus replayed offline, so the conclusions layer has a real hit rate
       instead of only unit tests
-- [ ] Chrome Web Store listing
+- [x] Chrome Web Store listing
 - [ ] Miner and skimmer detection — the one thing Netcraft does that Pagida does not
 - [ ] Firefox build — the code is MV3, the manifest needs a variant
 - [ ] Web Risk **Update API** — hash prefixes matched locally, so not even the

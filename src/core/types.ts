@@ -78,6 +78,8 @@ export interface PageEvidence {
   feedUrlHit?: boolean;
   /** Hostname present in a phishing feed (broader, slightly noisier). */
   feedHostHit?: boolean;
+  /** Domain is on the big local blocklist (Phishing.Database), after filtering. */
+  blocklistHit?: boolean;
   /** Google Safe Browsing returned a threat match. */
   safeBrowsingHit?: boolean;
   /** Google Web Risk, reached through the Pagida service. */
@@ -96,6 +98,8 @@ export interface PageEvidence {
 export interface DomEvidence {
   title: string;
   hasPasswordField: boolean;
+  /** The sign-in form is on screen: a visible password box, or a visible email/username box beside a not-yet-shown password box (two-step sign-in). False for a login modal that is closed. Undefined on old evidence. */
+  passwordFieldVisible?: boolean;
   /** Absolute URLs that forms containing a password field submit to. */
   passwordFormActions: string[];
   /** True when a password form posts to a different registrable domain. */
@@ -120,6 +124,38 @@ export interface DomEvidence {
   linkCount: number;
   /** Proportion of anchors that are dead (`#`, `javascript:void(0)` or empty). */
   deadLinkRatio: number;
+
+  // --- v5 offline engine (all optional: older evidence simply lacks them) ---
+  /** Brands whose own sign-in page structure is on this page (field ids kits copy). */
+  loginFingerprints?: string[];
+  /** Brands whose own servers supply this page's styles, scripts or images. */
+  brandAssets?: string[];
+  /** Brands whose logo or favicon this page shows, by image fingerprint (set by the worker). */
+  logoBrands?: string[];
+  /** Absolute URL of the favicon, so the worker can fingerprint it. */
+  faviconUrl?: string;
+  /** What the page asks for on screen, beyond a password. */
+  asksCard?: boolean;
+  asksOneTimeCode?: boolean;
+  asksSeedPhrase?: boolean;
+  /** Where form data or script calls go, when that is a known exfiltration service. */
+  exfilTarget?: string;
+  /** A Telegram bot or Discord webhook address is in the page's own code. */
+  botExfil?: boolean;
+  /** A command the page put on the clipboard, cleaned and cut to 300 characters. */
+  clipboardCommand?: string;
+  /** ClickFix: a command on the clipboard plus instructions to run it. */
+  clickFix?: boolean;
+  /** Visible text tells the person to open Run or Terminal and paste. */
+  runInstructions?: boolean;
+  /** Fake virus warning with a phone number. */
+  techSupportScam?: boolean;
+  /** "View this secure document" / "update Adobe to read this". */
+  documentLure?: boolean;
+  /** Crypto giveaway or airdrop text. */
+  cryptoLure?: boolean;
+  /** A brand sign-in address drawn as text in a fake window (browser-in-the-browser). */
+  fakeAddressBar?: string;
 }
 
 /**

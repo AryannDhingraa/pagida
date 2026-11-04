@@ -7,14 +7,14 @@
  */
 import type { Rule, Signal } from '../types.js';
 import { parseHost } from '../util/domain.js';
-import { BRAND_DOMAINS } from '../data/index.js';
+import { BRAND_DOMAINS, isWellKnown } from '../data/index.js';
 
 const sig = (s: Signal): Signal => s;
 
 export const newDomainAskingForPassword: Rule = (e) => {
   const age = e.domainAgeDays;
   if (age === undefined || age === null || age > 30) return null;
-  if (!e.dom?.hasPasswordField) return null;
+  if (!e.dom?.hasPasswordField || e.dom.passwordFieldVisible === false) return null;
   return sig({
     id: 'compound_new_domain_credential_form',
     title: 'Brand-new site asking for a password',
@@ -25,11 +25,12 @@ export const newDomainAskingForPassword: Rule = (e) => {
 };
 
 export const impersonationWithCredentialForm: Rule = (e) => {
-  if (!e.dom?.hasPasswordField) return null;
+  if (!e.dom?.hasPasswordField || e.dom.passwordFieldVisible === false) return null;
   const tokens = e.dom.brandTokens;
   if (tokens.length === 0) return null;
   const { registrableDomain } = parseHost(e.hostname);
   if (BRAND_DOMAINS.has(registrableDomain)) return null;
+  if (isWellKnown(registrableDomain) && !e.dom.crossOriginPasswordForm) return null;
   return sig({
     id: 'compound_impersonation_credential_form',
     title: 'Sign-in page for a brand that does not own this site',

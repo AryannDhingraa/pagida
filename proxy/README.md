@@ -19,34 +19,33 @@ month at no cost. That is the entire reason this is Web Risk.
 
 ## Cost
 
-| | Free tier | What Pagida uses |
+| | Free tier | What Pagida v5 uses |
 |---|---|---|
-| Cloudflare Workers | 100,000 requests/day | one per unique domain, per user, per 6 hours |
-| Cloudflare KV | 1,000 writes/day | one per lookup |
-| Google Web Risk | 100,000 lookups/month | one per uncached domain |
+| Cloudflare Workers | 100,000 requests/day | only lookups the extension could not answer offline |
+| Durable Objects (SQLite) | 100,000 requests and rows written/day | one per upstream lookup, for the exact daily budget |
+| Rate-limiting binding | per Cloudflare's plan | per-IP and per-install limits |
+| Google Web Risk | 100,000 lookups/month | at most 3,000 a day, so at most 93,000 a month |
 
-The Worker caches at Cloudflare's edge for 15 minutes and the extension caches
-locally for 6 hours, so popular domains cost one upstream call between all
-users. The realistic ceiling before any of this costs money is a few thousand
-active users. The KV write limit will bite before the Web Risk quota does; when
-it does, move the counter to Durable Objects or drop the per-install quota.
+v4 counted requests with three Workers KV writes each. KV's free plan allows
+1,000 writes a day and one write per second to the same key, so the proxy
+silently stopped after about 330 lookups a day. v5 uses no KV, and if the
+budget or the limiters are missing it refuses lookups rather than running
+unmetered. The extension treats "busy" as "no answer" and keeps working offline.
 
 ## Deploy
 
+The deployable project lives in its own folder (`pagida-proxy`, next to this
+repo), with `wrangler.jsonc` already declaring the Durable Object, its
+migration and both rate limiters. From that folder:
+
 ```bash
-npm create cloudflare@latest pagida-proxy
-cd pagida-proxy
-# replace src/index.js with worker.js from this directory
-
-npx wrangler kv namespace create QUOTA
-# paste the returned id into wrangler.toml:
-#   [[kv_namespaces]]
-#   binding = "QUOTA"
-#   id = "..."
-
+npm install
 npx wrangler secret put WEB_RISK_KEY   # paste your Web Risk API key
 npx wrangler deploy
 ```
+
+After deploying v5, delete the old `QUOTA` KV namespace in the Cloudflare
+dashboard: nothing uses it any more.
 
 Getting the key: Google Cloud Console → create a project → enable the **Web Risk
 API** → Credentials → Create credentials → API key. Restrict it to the Web Risk
@@ -63,7 +62,7 @@ Rebuild the extension. Check it works:
 
 ```bash
 curl 'https://pagida-proxy.<your-subdomain>.workers.dev/v1/health'
-# {"ok":true,"webRisk":true}
+# {"ok":true,"webRisk":true,"metered":true}   <- "metered":false means lookups are refused
 ```
 
 ## What it deliberately does not do
