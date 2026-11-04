@@ -23,8 +23,9 @@ const pkg = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'));
 /** Service worker and content script are separate bundles with different formats. */
 const bundles = [
   { in: 'src/background/index.ts', out: 'background', format: 'esm' },
-  { in: 'src/content/index.ts', out: 'content', format: 'iife' },
-  { in: 'src/content/clipboard-main.ts', out: 'clipboard', format: 'iife' },
+  { in: 'src/content/page/index.ts', out: 'content', format: 'iife' },
+  { in: 'src/content/page/clipboard-main.ts', out: 'clipboard', format: 'iife' },
+  { in: 'src/content/mail/index.ts', out: 'mail', format: 'iife' },
   { in: 'src/popup/popup.ts', out: 'popup', format: 'iife' },
   { in: 'src/options/options.ts', out: 'options', format: 'iife' },
   { in: 'src/report/report.ts', out: 'report', format: 'iife' },

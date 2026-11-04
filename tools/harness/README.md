@@ -37,3 +37,25 @@ Pass criteria for a release:
   never "Likely phishing";
 - no drop in live phishing flagged at "Suspicious" or above;
 - every attack page at "Likely phishing", both honest look-alikes below "Suspicious".
+
+## Email (`mail-e2e.cjs`)
+
+`mail-pages/` holds mock Gmail and Outlook messages: a CommBank phish from a
+Gmail address with a disguised link, an HTML attachment and a QR code; a fake
+Microsoft 365 password notice; a "your mailbox is full" notice that uses the
+reader's organisation name and links to IPFS; and a real CommBank statement
+email and a real Microsoft renewal email that must stay quiet.
+
+They are served over HTTPS on 127.0.0.1:443, and Chromium is told that
+`mail.google.com` and `outlook.office.com` live there, so the mail script runs
+exactly as it does on the real sites. The Pagida service is forced off.
+
+```bash
+cd tools/harness/mail-pages
+openssl req -x509 -newkey rsa:2048 -nodes -keyout key.pem -out cert.pem -days 30 -subj /CN=pagida-test
+sudo python3 serve.py 443 &
+cd ../../.. && EXT=dist node tools/harness/mail-e2e.cjs
+```
+
+Pass: a "Likely phishing" card on each attack with its link held behind a
+confirm, nothing on the two real emails, and the QR code read in the worker.

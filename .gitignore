@@ -15,3 +15,5 @@ notes/
 evidence/
 samples/private/
 docs/store/
+__pycache__/
+tools/harness/mail-pages/*.pem

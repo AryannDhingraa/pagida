@@ -15,7 +15,7 @@
  * page could also send. That is fine: the worst a page can do with a forged
  * message is get itself flagged.
  */
-import { isClickFix, looksLikeCommand, normaliseCommand } from '../core/lures.js';
+import { isClickFix, looksLikeCommand, normaliseCommand } from '../../core/lures.js';
 
 const WARNING = 'Pagida stopped this: the page tried to make you run a command on your computer. Do not paste anything it asks you to. Close the page.';
 

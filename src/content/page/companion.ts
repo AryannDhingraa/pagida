@@ -9,9 +9,9 @@
  * She is draggable and remembers where she was put, because a fixed bubble in
  * the corner is the thing that covers the one control you needed.
  */
-import type { Verdict } from '../core/types.js';
-import { adviceFor, headlineFor } from '../core/score.js';
-import { Iris, expressionForBand, injectIrisCss, IRIS_CSS } from '../ui/iris.js';
+import type { Verdict } from '../../core/types.js';
+import { adviceFor, headlineFor } from '../../core/wording.js';
+import { Iris, expressionForBand, injectIrisCss, IRIS_CSS } from '../../ui/iris.js';
 
 const HOST_ID = 'pagida-companion-host';
 const POSITION_KEY = 'pagida:companion-position';

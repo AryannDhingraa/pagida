@@ -11,15 +11,16 @@ it — then shows you every single reason behind that answer. No account, no
 tracking. Since v5 the whole engine runs offline on your machine: copied
 sign-in pages, fake CAPTCHAs that try to make you run a command, fake virus
 warnings and recovery-phrase thieves are all caught without asking a server.
+Since v6 it also checks the emails you open in Gmail and Outlook on the web.
 
 [![CI](https://github.com/AryannDhingraa/pagida/actions/workflows/ci.yml/badge.svg)](https://github.com/AryannDhingraa/pagida/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Manifest V3](https://img.shields.io/badge/manifest-v3-blue.svg)](src/manifest.json)
-[![Tests](https://img.shields.io/badge/tests-168%20passing-brightgreen.svg)](test)
+[![Tests](https://img.shields.io/badge/tests-218%20passing-brightgreen.svg)](test)
 
 *παγίδα — Greek for "trap".*
 
-**[Install from the Chrome Web Store](https://chromewebstore.google.com/detail/bcjboonbeegdjfcgijbbeccpcighafll)** · [What changed in v5](CHANGELOG.md)
+**[Install from the Chrome Web Store](https://chromewebstore.google.com/detail/bcjboonbeegdjfcgijbbeccpcighafll)** · [What changed in v6](CHANGELOG.md)
 
 </div>
 
@@ -58,6 +59,23 @@ reasoning is all there, in ordinary words:
 
 You can disagree with it, and you can learn from it. Both matter more than the
 number.
+
+### Email
+
+Open an email in Gmail or Outlook on the web and Pagida checks it where it
+sits. A dangerous one gets a card above it that says what is wrong, and its
+risky links ask before they open:
+
+> **This is not CommBank: it was sent from a gmail.com address**
+> The name says CommBank but the address is netbank.security.team@gmail.com.
+> CommBank's real emails come from commbank.com.au.
+
+It looks at who sent it (brand names on the wrong address, lookalike domains,
+your own organisation's name used from outside), where the links really go,
+attachments that are web pages or programs, QR codes, and what the email wants:
+a changed bank account, a "full mailbox", a phone call about a charge you never
+made. A trained model reads the wording inside the tab. The email itself never
+leaves your computer.
 
 ## The site report
 
@@ -224,6 +242,10 @@ off in Options, and **none of them carries a page you visited**:
 3. **`raw.githubusercontent.com`** — downloads the OpenPhish public blocklist
    once every 12 hours. The matching then happens on your machine.
 
+Email checking adds nothing new to that list: the email stays on your
+computer, and only the domains of an unknown sender and its links go through
+the first two lookups.
+
 Opening a site report adds six more domain-level lookups, listed in
 [PRIVACY.md](PRIVACY.md), and only while the report is open.
 
@@ -280,34 +302,33 @@ There is no `tabs` permission. Pagida never reads your tab list or your history.
 
 ```
 src/
-├── core/              ← pure TypeScript, zero browser APIs
-│   ├── rules/         ← url · dom · reputation · compound
-│   ├── util/          ← domain parsing, edit distance, homographs, entropy
-│   ├── data/          ← brands, TLD lists, generated allowlist
-│   ├── evidence.ts    ← URL → PageEvidence
-│   └── score.ts       ← PageEvidence → Verdict
-├── ui/                ← iris (the mascot) · stepper — shared across every page
-├── content/           ← reads the page, sends a summary, brings Iris onto it
-├── background/        ← service worker: orchestration, caching, context menus
-├── services/          ← rdap · feeds · safebrowsing · dns · netinfo · certs · report
-├── popup/ options/ report/
-└── manifest.json
+├── core/        the web engine: pure TypeScript, zero browser APIs
+├── email/       the email engine: pure TypeScript, zero browser APIs
+├── learned/     the trained text models and their tokenizer
+├── content/     page/ (every site) and mail/ (Gmail and Outlook only)
+├── background/  service worker: orchestration, lookups, icon, menus
+├── services/    blocklists, feeds, RDAP, the Pagida service, QR codes, reports
+├── ui/          Iris and shared pieces
+└── popup/ options/ report/
 ```
 
-The one design decision everything else follows from: **`src/core` has no
-browser APIs.** That is what lets the Node evaluation harness import the exact
-same scoring code the extension runs, so the published metrics measure the
-shipped engine rather than a reimplementation of it.
+The one design decision everything else follows from: **`src/core` and
+`src/email` have no browser APIs.** That is what lets the tests and the
+evaluation scripts import the exact code the extension runs, so the published
+numbers measure the shipped engine rather than a reimplementation of it.
+[ARCHITECTURE.md](ARCHITECTURE.md) walks through both paths and the training data.
 
 ## Development
 
 ```bash
 npm install
 npm run dev          # rebuild on change — load dist/ as an unpacked extension
-npm test             # 87 unit tests
+npm test             # 218 unit tests
 npm run typecheck
 npm run lint
-npm run evaluate     # fetch today's feeds and re-measure
+npm run evaluate     # fetch today's feeds and re-measure the address tier
+python3 scripts/train-text-models.py --data ../data   # retrain both text models
+node scripts/run-ts.mjs scripts/evaluate-email.ts     # measure the email engine (see EVALUATION.md)
 npm run build:allowlist   # regenerate the well-known-domain list
 npm run zip          # package for the Chrome Web Store
 ```
@@ -339,10 +360,21 @@ blind spots is worse than one that has them.
 - **The brand list is finite.** ~100 brands, weighted towards what Australian
   users actually get targeted with. A brand that is not on the list gets no
   impersonation detection.
-- **No machine learning, by choice.** A trained classifier would likely improve
-  recall and would definitely destroy the explanation, which is the entire
-  point of the tool. It is on the roadmap as an *additional* tier, never as a
-  replacement.
+- **The trained models never decide alone.** Two small text models (emails and
+  pages) adjust the score, and the email one can only reach a warning together
+  with the structure of a phishing email. That keeps the explanation intact and
+  costs some recall on cleverly worded mail.
+- **Email checking is web only.** Gmail and Outlook in the browser. Not the
+  Outlook desktop app, Apple Mail or phone apps.
+- **Webmail can change its markup.** The adapters use the long-lived parts of
+  Gmail's and Outlook's pages, and a change there makes Pagida quietly skip the
+  email rather than break the inbox. That is safe, and it is also silent.
+- **No mail headers.** Webmail does not show SPF, DKIM or DMARC results to the
+  page, so a forged sender on a real brand's domain is only caught by what the
+  email asks for and where its links go.
+- **The legitimate test mail is old.** The held-out legitimate emails come from
+  the 2002 SpamAssassin corpus. Modern newsletters are the likeliest place for a
+  false alarm, which is why the model alone never raises one.
 - **DOM inspection is heuristic.** Inline paste-blockers are detectable;
   handlers added by JavaScript are not.
 
@@ -358,8 +390,10 @@ blind spots is worse than one that has them.
       domain leaves the machine
 - [ ] A second opinion tier: optional VirusTotal and urlscan.io enrichment,
       user-keyed, because their terms do not allow proxying
-- [ ] An offline-trained model as a fourth tier, with per-feature attributions
-      so the explanation survives
+- [x] Trained text models for pages and emails, as nudges that keep the explanation
+- [x] Email checking in Gmail and Outlook on the web
+- [ ] A modern legitimate-email test set, so false alarms on today's newsletters are measured
+- [ ] Outlook add-in and Gmail add-on, for the desktop and phone apps
 
 ## A note on the licence terms of the data sources
 
@@ -393,3 +427,9 @@ tells you how to report it.
 MIT © Aryan Dhingra. Phishing data from the
 [OpenPhish community feed](https://github.com/openphish/public_feed); domain
 registration data via [RDAP](https://rdap.org).
+
+The text models were trained on the
+[Nazario phishing corpus](https://monkey.org/~jose/phishing/) (CC BY 4.0, by
+Jose Nazario), the [SpamAssassin public corpus](https://spamassassin.apache.org/old/publiccorpus/)
+and [ealvaradob/phishing-dataset](https://huggingface.co/datasets/ealvaradob/phishing-dataset)
+(Apache-2.0). The weights in `src/learned/data` are derived from them.

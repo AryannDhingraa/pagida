@@ -156,6 +156,8 @@ export interface DomEvidence {
   cryptoLure?: boolean;
   /** A brand sign-in address drawn as text in a fake window (browser-in-the-browser). */
   fakeAddressBar?: string;
+  /** v6: the trained page-text model's probability of phishing, computed in the page. */
+  textModelScore?: number | null;
 }
 
 /**

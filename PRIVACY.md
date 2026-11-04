@@ -1,7 +1,7 @@
 # Privacy Policy
 
 **Pagida — Phishing Detector**
-Last updated: 4 November 2026 (version 5.0.0)
+Last updated: 4 November 2026 (version 6.0.0)
 
 ## The short version
 
@@ -16,6 +16,12 @@ address of the page you are on. It is only asked about sites that are not among
 the world's 10,000 best known, at most once a day per site, and never about
 your own network (routers, `localhost`, `.local`, intranet names). It stores
 nothing about you. Turning it off leaves Pagida fully working, offline.
+
+Since version 6 Pagida also checks the emails you open in Gmail and Outlook
+on the web. **The email itself never leaves your computer**: not its words, not
+its sender, not its links. The text model reads it inside the tab. The only
+things that go online are domain names, in the same two lookups Pagida already
+makes for web pages, and only for emails that are not already called an attack.
 
 Everything below is the long version, source by source.
 
@@ -32,13 +38,37 @@ browser profile, and nowhere else.
 | Domain-age cache | Registrable domains and their registration age, kept for 7 days |
 | Blocklists | A copy of the public OpenPhish feed, refreshed every 12 hours, and a fingerprinted copy of Phishing.Database's active phishing domains (about 3 MB, in IndexedDB), refreshed daily |
 | Lookup memory | For up to 3,000 sites: the fact that Google's list had nothing on them, and when. Kept for 24 hours (1 hour on shared hosts like github.io), so the proxy is not asked again |
-| Counters | Three numbers: pages checked, warnings raised, sites you reported |
+| Counters | Four numbers: pages checked, emails checked, warnings raised, sites you reported |
 
 Pagida deliberately does **not** use `chrome.storage.sync`. Sync would push
 browsing-derived data through your Google account, and a tool built to protect
 your browsing should not quietly move it somewhere else.
 
 Uninstalling the extension deletes all of it.
+
+## Email checking (on by default)
+
+Pagida's mail script runs only on `mail.google.com`, `outlook.live.com`,
+`outlook.office.com` and `outlook.office365.com`. When you open an email it
+reads what is on screen: the sender's name and address, your own address, the
+subject, the body text, the links, attachment names, and images the webmail
+has already loaded.
+
+- The trained text model scores the subject and body **inside the tab**. Only
+  its one number is passed on, to Pagida's own service worker on this computer.
+- The worker checks links against the local blocklists and rules, and decodes
+  QR codes from the images. To decode a QR code it fetches the image again,
+  without cookies, and only images the webmail has already shown you. If your
+  webmail is blocking a sender's images, Pagida does not fetch them, so it
+  cannot tell a sender you opened their email.
+- Nothing about an email is stored. Not the email, not the verdict.
+- Online, for an email that is not already called an attack: the registrable
+  domains of the sender and of up to three unknown links go to `rdap.org` for
+  their age (section 2 below), and up to three unknown link hostnames go to the
+  Pagida service (section 1 below). Never a full link, never the sender's
+  address, never anything from the email's text. Well-known sites and brand
+  domains are never looked up.
+- Switch it off: Options → *Check my emails*.
 
 ## What leaves your computer
 

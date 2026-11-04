@@ -6,10 +6,10 @@
  * could contain a password, a session token or personal text ever leaves the
  * tab, not even into extension storage.
  */
-import type { DomEvidence } from '../core/types.js';
-import { parseHost } from '../core/util/domain.js';
-import type { TechFacts } from '../services/report.js';
-import { identityBrands } from '../core/brandText.js';
+import type { DomEvidence } from '../../core/types.js';
+import { parseHost } from '../../core/util/domain.js';
+import type { TechFacts } from '../../services/report.js';
+import { identityBrands } from '../../core/brandText.js';
 import { extractOffline } from './offline.js';
 
 const OBFUSCATION_MARKERS = [

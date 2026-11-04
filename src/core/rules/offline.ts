@@ -157,7 +157,38 @@ export const cryptoLure: Rule = (e) => {
   });
 };
 
+/**
+ * The trained page-text model (src/learned). It read 11,000 real phishing and
+ * legitimate pages; on held-out pages it was right 98% of the time by AUC but
+ * still flagged 7% of legitimate ones. So it only speaks on an unknown site
+ * that is asking for a secret, and it only nudges the score.
+ */
+export const pageTextModel: Rule = (e) => {
+  const p = e.dom?.textModelScore;
+  if (typeof p !== 'number' || trustedName(reg(e.hostname)) || !asksForSecret(e)) return null;
+  if (p >= 0.9) {
+    return sig({
+      id: 'page_text_model',
+      title: 'Reads like a phishing page',
+      detail: `Pagida's trained model, which has read thousands of real phishing and legitimate pages, puts this one at ${Math.round(p * 100)}%. It adjusts the score; it never decides on its own.`,
+      tier: 'dom',
+      weight: 14,
+    });
+  }
+  if (p <= 0.05) {
+    return sig({
+      id: 'page_text_model',
+      title: 'Reads like an ordinary page',
+      detail: `Pagida's trained model puts this page at ${Math.round(p * 100)}% phishing.`,
+      tier: 'dom',
+      weight: -6,
+    });
+  }
+  return null;
+};
+
 export const OFFLINE_RULES: Rule[] = [
+  pageTextModel,
   copiedSignInPage,
   borrowedLogo,
   borrowedAssets,

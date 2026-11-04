@@ -18,6 +18,10 @@ import { lookupReputation } from '../services/pagidaApi.js';
 import { forget, rememberClean, rememberedClean, bumpLookupStat } from '../services/memory.js';
 import { blocklistSize, getIndex, listed, refreshBlocklist } from '../services/blocklist.js';
 import { logoBrands } from '../services/logo.js';
+import { decodeQr } from '../services/qr.js';
+import { checkLink, evaluateEmail, senderDomain } from '../email/evaluate.js';
+import { FREE_MAIL } from '../email/patterns.js';
+import type { EmailEvidence, LinkFinding } from '../email/types.js';
 import { buildReport, type TechFacts } from '../services/report.js';
 import { animateIcon, setIconBand } from './icon.js';
 import {
@@ -198,6 +202,77 @@ async function score(url: string, dom?: DomEvidence): Promise<Verdict | null> {
   return verdict;
 }
 
+// ---------------------------------------------------------------- email
+
+/**
+ * Check one open email: every link and QR code through the web engine and the
+ * local blocklists, then the email rules, then (online, when it can still
+ * matter) domain ages and Google's threat lists for the unknown domains.
+ */
+const hostOf = (href: string): string => { try { return new URL(href).hostname.toLowerCase(); } catch { return ''; } };
+
+async function scoreEmail(email: EmailEvidence, imageUrls: string[]) {
+  const settings = await getSettings();
+  const qrUrls: string[] = [];
+  for (const img of imageUrls.slice(0, 3)) {
+    const data = await decodeQr(img);
+    if (data && /^https?:\/\//i.test(data)) qrUrls.push(data);
+  }
+  const targets = [...new Set([...email.links.map((l) => l.href), ...qrUrls])].slice(0, 40);
+  const feed = settings.useFeeds ? await loadFeed() : null;
+  const index = settings.useFeeds ? await getIndex() : null;
+  const findings: LinkFinding[] = targets.map((href) => {
+    const f = checkLink(href);
+    try {
+      const host = new URL(href).hostname.toLowerCase();
+      const { sld } = parseHost(host);
+      const listedInFeed = !!feed && (feed.urls.has(normaliseUrl(href)) || (feed.hosts.has(host) && !isSharedHost(host, sld, false)));
+      f.listed = listedInFeed || (!!index && listed(index, host));
+    } catch { /* not a URL */ }
+    return f;
+  });
+  let verdict = evaluateEmail({ ...email, qrUrls }, findings);
+
+  // ---- Online checks, only while they can still change the answer. ----
+  // Only domain names leave the computer, never the email or a full link:
+  // the registry is asked how old the sender's and links' domains are, and
+  // the Pagida service whether a link's hostname is on Google's threat lists.
+  // Known sites are never asked about, and an email already called an attack
+  // needs no second opinion.
+  if (verdict.band !== 'danger') {
+    const unknownHosts = [...new Set(targets.map(hostOf).filter((h) => h && !isPrivateHost(h)))]
+      .filter((h) => { const d = parseHost(h).registrableDomain; return !BRAND_DOMAINS.has(d) && !isWellKnown(d); })
+      .slice(0, 3);
+    let changed = false;
+    const domainAges: Record<string, number | null> = {};
+    if (settings.useRdap) {
+      const sender = senderDomain(email.fromAddress);
+      const domains = [...new Set([sender, ...unknownHosts.map((h) => parseHost(h).registrableDomain)])]
+        .filter((d) => d && !FREE_MAIL.has(d) && !BRAND_DOMAINS.has(d) && !isWellKnown(d)).slice(0, 4);
+      for (const d of domains) {
+        const age = await domainAgeDays(d);
+        if (age !== undefined) { domainAges[d] = age; changed = true; }
+      }
+    }
+    if (settings.usePagidaService) {
+      for (const host of unknownHosts) {
+        if (await rememberedClean(host)) { void bumpLookupStat('remembered'); continue; }
+        const rep = await lookupReputation(host);
+        void bumpLookupStat('asked');
+        if (!rep) continue;
+        if (!rep.listed) { await rememberClean(host); continue; }
+        for (const f of findings) if (hostOf(f.href) === host) f.listed = true;
+        changed = true;
+      }
+    }
+    if (changed) verdict = evaluateEmail({ ...email, qrUrls, domainAges }, findings);
+  }
+
+  await bumpStat('emailsChecked');
+  if (verdict.conclusions.length > 0) await bumpStat('warnings');
+  return { verdict, findings };
+}
+
 // ---------------------------------------------------------------- messages
 
 chrome.runtime.onMessage.addListener((msg: Message, sender, sendResponse) => {
@@ -335,6 +410,13 @@ chrome.runtime.onMessage.addListener((msg: Message, sender, sendResponse) => {
             url: chrome.runtime.getURL(`report.html?u=${encodeURIComponent(msg.url)}`),
           });
           return sendResponse({ ok: true });
+        }
+
+        case 'EMAIL_SIGNALS': {
+          const settings = await getSettings();
+          if (!settings.enabled || !settings.checkEmail) return sendResponse({ ok: false, error: 'off' });
+          const { verdict, findings } = await scoreEmail(msg.email, msg.imageUrls);
+          return sendResponse({ ok: true, verdict, findings });
         }
 
         case 'RESCAN':

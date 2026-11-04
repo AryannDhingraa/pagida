@@ -5,6 +5,7 @@
  */
 import type { DomEvidence, Verdict } from '../core/types.js';
 import type { SiteReport, TechFacts } from '../services/report.js';
+import type { EmailEvidence } from '../email/types.js';
 
 export type Message =
   /** Content script -> worker: here is what the page looks like. */
@@ -30,7 +31,9 @@ export type Message =
   | { type: 'SHOW_COMPANION'; verdict: Verdict }
   | { type: 'HIDE_COMPANION' }
   /** Popup -> content script: report your signals again, right now. */
-  | { type: 'RESCAN' };
+  | { type: 'RESCAN' }
+  /** Webmail content script -> worker: check this open email. */
+  | { type: 'EMAIL_SIGNALS'; email: EmailEvidence; imageUrls: string[] };
 
 export type Response =
   | { ok: true; verdict: Verdict }

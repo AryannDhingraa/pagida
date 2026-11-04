@@ -208,6 +208,12 @@ const passwordLeavesTheSite: ConclusionRule = ({ evidence: e }) => {
   // attack whether or not it has been revealed yet.
   if (!dom?.hasPasswordField || !postsToStranger(e)) return null;
   if (dom.brandTokens.length > 0 && asksForPassword(e)) return null; // covered, more strongly, above
+  // A top-10k site or a brand's own domain posting to its own sign-in service
+  // on another domain (index.hu to its account service) is single sign-on,
+  // not theft. A hacked top site sending passwords to a relay is caught by the
+  // relay rule, which names where the data goes.
+  const here = parseHost(e.hostname).registrableDomain;
+  if (isWellKnown(here) || BRAND_DOMAINS.has(here)) return null;
 
   const target = dom.passwordFormActions[0];
   let where = 'another site';
@@ -257,7 +263,7 @@ const brandLookalikePage: ConclusionRule = ({ evidence: e, fired }) => {
   const { registrableDomain } = parseHost(e.hostname);
   if (BRAND_DOMAINS.has(registrableDomain) || isWellKnown(registrableDomain)) return null;
   const young = e.domainAgeDays !== undefined && e.domainAgeDays !== null && e.domainAgeDays <= 30;
-  const tells = ['hotlinked_brand_favicon', 'brand_in_subdomain', 'brand_typosquat', 'brand_confusable_domain',
+  const tells = ['hotlinked_brand_favicon', 'brand_in_subdomain', 'brand_in_domain_name', 'brand_typosquat', 'brand_confusable_domain',
     'brand_on_foreign_tld', 'document_lure', 'borrowed_brand_logo', 'copied_sign_in_page', 'wordpress_internal_path',
     'wordpress_upload_path', 'free_hosting_subdomain']
     .filter((id) => fired.has(id));

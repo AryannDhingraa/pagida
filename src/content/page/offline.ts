@@ -5,17 +5,19 @@
  * handful of booleans and brand names, plus (for ClickFix only) the first 300
  * characters of a command the page itself tried to put on the clipboard.
  */
-import type { DomEvidence } from '../core/types.js';
-import { BITB_HOSTS, BRAND_ASSET_HOSTS, LOGIN_FINGERPRINTS } from '../core/data/fingerprints.js';
+import type { DomEvidence } from '../../core/types.js';
+import { BITB_HOSTS, BRAND_ASSET_HOSTS, LOGIN_FINGERPRINTS } from '../../core/data/fingerprints.js';
 import {
   exfilTarget, hasRunInstructions, isBotExfil, isClickFix, isCryptoClaimLure, isDocumentLure,
   isTechSupportScam, mentionsSeedPhrase,
-} from '../core/lures.js';
+} from '../../core/lures.js';
+import { score as modelScore } from '../../learned/textModel.js';
+import { PAGE_MODEL } from '../../learned/data/pageModel.js';
 
 type Offline = Pick<DomEvidence,
   'loginFingerprints' | 'brandAssets' | 'faviconUrl' | 'asksCard' | 'asksOneTimeCode' | 'asksSeedPhrase'
   | 'exfilTarget' | 'botExfil' | 'clipboardCommand' | 'clickFix' | 'runInstructions' | 'techSupportScam'
-  | 'documentLure' | 'cryptoLure' | 'fakeAddressBar'>;
+  | 'documentLure' | 'cryptoLure' | 'fakeAddressBar' | 'textModelScore'>;
 
 function visible(el: Element): boolean {
   const r = (el as HTMLElement).getBoundingClientRect();
@@ -137,5 +139,7 @@ export function extractOffline(): Offline {
     documentLure: isDocumentLure(text),
     cryptoLure: isCryptoClaimLure(text),
     fakeAddressBar: isLoginish || document.querySelector('iframe') ? fakeAddressBar() : undefined,
+    // Only the number leaves the page, never the words.
+    textModelScore: isLoginish ? modelScore(PAGE_MODEL, `${document.title}\n${text}`) : null,
   };
 }

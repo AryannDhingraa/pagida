@@ -33,6 +33,7 @@ const controls = {
   useRdap: $<HTMLInputElement>('useRdap'),
   useFeeds: $<HTMLInputElement>('useFeeds'),
   usePagidaService: $<HTMLInputElement>('usePagidaService'),
+  checkEmail: $<HTMLInputElement>('checkEmail'),
   useSafeBrowsing: $<HTMLInputElement>('useSafeBrowsing'),
   safeBrowsingKey: $<HTMLInputElement>('safeBrowsingKey'),
   sbKeyRow: $<HTMLElement>('sbKeyRow'),
@@ -176,13 +177,14 @@ async function loadSettings(): Promise<void> {
   controls.useRdap.checked = s.useRdap;
   controls.useFeeds.checked = s.useFeeds;
   controls.usePagidaService.checked = s.usePagidaService;
+  controls.checkEmail.checked = s.checkEmail;
   controls.useSafeBrowsing.checked = s.useSafeBrowsing;
   controls.safeBrowsingKey.value = s.safeBrowsingKey;
   syncKeyRow();
 }
 
 function wire(): void {
-  const bind = (input: HTMLInputElement, key: 'enabled' | 'showBanner' | 'siteReport' | 'useRdap' | 'useFeeds' | 'usePagidaService' | 'useSafeBrowsing') => {
+  const bind = (input: HTMLInputElement, key: 'enabled' | 'showBanner' | 'siteReport' | 'useRdap' | 'useFeeds' | 'usePagidaService' | 'useSafeBrowsing' | 'checkEmail') => {
     input.addEventListener('change', () => {
       void setSettings({ [key]: input.checked });
       if (key === 'enabled') {
@@ -197,6 +199,7 @@ function wire(): void {
   bind(controls.useRdap, 'useRdap');
   bind(controls.useFeeds, 'useFeeds');
   bind(controls.usePagidaService, 'usePagidaService');
+  bind(controls.checkEmail, 'checkEmail');
   bind(controls.useSafeBrowsing, 'useSafeBrowsing');
   controls.useSafeBrowsing.addEventListener('change', syncKeyRow);
 

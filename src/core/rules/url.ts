@@ -211,6 +211,30 @@ export const brandOutsideRegistrable: Rule = (e) => {
   return null;
 };
 
+/**
+ * The brand is one of the hyphenated words of the domain itself:
+ * `paypal-secure-login.com`, `secure-commbank-au.top`. Whoever registered it
+ * chose that word. v5 only looked for brands in subdomains and exact names.
+ */
+export const brandInDomainName: Rule = (e) => {
+  const { registrableDomain, sld, isIpLiteral } = parseHost(e.hostname);
+  if (isIpLiteral || !sld.includes('-') || isTrustedName(registrableDomain)) return null;
+  const parts = words(sld);
+  const grams = new Set([...parts, ...parts.slice(1).map((w, i) => parts[i] + w)]);
+  for (const token of BRAND_TOKENS) {
+    if (token.length < 4 || AMBIGUOUS_TOKENS.has(token) || !grams.has(token)) continue;
+    if (domainsForToken(token).includes(registrableDomain)) continue;
+    return sig({
+      id: 'brand_in_domain_name',
+      title: `Domain name uses "${token}" but is not ${token}`,
+      detail: `${registrableDomain} has "${token}" in its name, but it is not one of ${token}'s own domains. Anyone can register a name like that.`,
+      tier: 'url',
+      weight: 28,
+    });
+  }
+  return null;
+};
+
 /** `https://paypal.com@evil.tk/` — the browser goes to evil.tk. */
 export const embeddedCredentials: Rule = (e) => {
   if (!e.hasEmbeddedCredentials) return null;
@@ -483,7 +507,9 @@ export const generatedPathSegment: Rule = (e) => {
  */
 export const emailInUrl: Rule = (e) => {
   if (isTrustedName(parseHost(e.hostname).registrableDomain)) return null;
-  const haystack = decodeURIComponent(e.query + e.path);
+  let haystack = e.query + e.path;
+  // A stray "%" in a real link must not stop the whole check.
+  try { haystack = decodeURIComponent(haystack); } catch { /* keep it encoded */ }
   const match = haystack.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/);
   if (!match) return null;
   return sig({
@@ -558,6 +584,7 @@ export const URL_RULES: Rule[] = [
   brandTyposquat,
   brandOnForeignTld,
   brandOutsideRegistrable,
+  brandInDomainName,
   embeddedCredentials,
   noHttps,
   highAbuseTld,

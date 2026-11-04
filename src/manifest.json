@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Pagida \u2014 Phishing Detector",
-  "version": "5.0.0",
-  "description": "Iris checks every page for scams and shows you exactly what she found, in plain English. Runs locally. No tracking.",
+  "name": "Pagida — Phishing Detector",
+  "version": "6.0.0",
+  "description": "Iris checks web pages and Gmail or Outlook emails for scams, and shows you exactly what she found. Runs on your computer.",
   "author": "Aryan Dhingra",
   "homepage_url": "https://github.com/AryannDhingraa/pagida",
   "minimum_chrome_version": "116",
@@ -14,7 +14,7 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Pagida \u2014 Iris is watching this page",
+    "default_title": "Pagida — Iris is watching this page",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",
@@ -50,6 +50,19 @@
       "run_at": "document_start",
       "all_frames": false,
       "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://mail.google.com/*",
+        "https://outlook.live.com/*",
+        "https://outlook.office.com/*",
+        "https://outlook.office365.com/*"
+      ],
+      "js": [
+        "mail.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
     }
   ],
   "permissions": [

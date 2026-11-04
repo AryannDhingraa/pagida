@@ -1,5 +1,48 @@
 # Changelog
 
+## 6.0.0, November 2026: email
+
+Pagida now checks the emails you open in Gmail and Outlook on the web, with
+the same rule as for web pages: it only warns when it can say why in one
+sentence.
+
+### Email checking
+- **Gmail and Outlook on the web** (outlook.live.com, outlook.office.com,
+  outlook.office365.com). A card appears above a dangerous email, and every
+  risky link in it asks before it opens. Nothing appears on ordinary mail.
+- **Who sent it**: a brand name on the wrong address ("CommBank" from a Gmail
+  account), lookalike sender domains, "via OneDrive" style names, and emails
+  that use your own organisation's name ("monkey.org Helpdesk") from somewhere
+  else.
+- **Where the links go**: every link is unwrapped (Gmail, Safe Links,
+  Proofpoint) and checked with the web engine and the local blocklists. Link
+  text that shows one address and opens another. Links to IPFS, storage
+  buckets and free site builders when the email wants you to sign in.
+- **What is attached**: web-page and program attachments, Office macros.
+- **QR codes**: decoded from images the webmail has already loaded, and
+  checked like links. "Scan to verify" to an unknown site is called out.
+- **What it asks for**: changed bank details, gift cards, "your mailbox is
+  full", "your password expires today", and fake receipts that want you to
+  phone a number about a charge (callback scams).
+- **Online when it helps**: for an email not already called an attack, the
+  age of the sender's and links' domains, and Google's threat lists for
+  unknown link hostnames. Only domain names are sent; the email itself never
+  leaves the computer.
+- Switch it off in Options: *Check my emails*.
+
+### Trained models
+- **Email model**: trained on the Nazario phishing corpus (2019 to 2024),
+  ealvaradob/phishing-dataset and the SpamAssassin public corpus. Tested on
+  Nazario 2025 and held-out SpamAssassin mail it never saw: AUC 0.992. It
+  runs in the tab and only counts together with the shape of a phishing email.
+- **Page model**: trained on the same Hugging Face dataset's web pages (AUC
+  0.976). Used only on unknown sites that ask for a password, card or code.
+
+### Fixes
+- A link or page address with a stray `%` no longer stops the whole check.
+- The page script is smaller (269 KB, down from 365 KB in v5): the wording
+  moved out of the scoring module, so the page no longer bundles the allowlist.
+
 ## 5.0.0 — November 2026: the offline engine
 
 Pagida now catches phishing on its own, on your computer. The Google lookup

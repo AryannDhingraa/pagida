@@ -14,8 +14,8 @@
 import { extractDomEvidence, extractTechFacts } from './extract.js';
 import { noteClipboard } from './offline.js';
 import { hideCompanion, showCompanion } from './companion.js';
-import { evidenceSignature } from '../core/evidence.js';
-import type { Message } from '../shared/messages.js';
+import { evidenceSignature } from '../../core/evidence.js';
+import type { Message } from '../../shared/messages.js';
 
 /** Upper bound on reports per page load, regardless of how busy the DOM is. */
 const MAX_REPORTS_PER_PAGE = 4;

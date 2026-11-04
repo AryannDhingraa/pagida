@@ -114,3 +114,16 @@ describe('v4 keeps catching what v3 caught for the right reasons', () => {
     expect(v.band).toBe('danger');
   });
 });
+
+describe('single sign-on on a top site', () => {
+  it('a top-10k news site whose login posts to its own account service is not "Likely phishing"', async () => {
+    const { evaluate } = await import('../src/core/score.js');
+    const { evidenceFromUrl } = await import('../src/core/evidence.js');
+    const base = evidenceFromUrl('https://index.hu/')!;
+    const v = evaluate({ ...base, dom: {
+      hasPasswordField: true, crossOriginPasswordForm: true, passwordFormActions: ['https://account.indavideo.hu/login'],
+      brandTokens: [], hiddenIframeCount: 0, externalFormActionCount: 1, obfuscationScore: 0,
+    } as never });
+    expect(v.band).not.toBe('danger');
+  });
+});

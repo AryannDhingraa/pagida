@@ -139,3 +139,12 @@ describe('brand name on a foreign TLD', () => {
     expect(firedIds('https://www.apple.com.au/')).not.toContain('brand_on_foreign_tld');
   });
 });
+
+describe('malformed addresses', () => {
+  it('a stray percent sign does not throw', async () => {
+    const { evidenceFromUrl } = await import('../src/core/evidence.js');
+    const { evaluate } = await import('../src/core/score.js');
+    const ev = evidenceFromUrl('https://shop.example.com/sale?off=50%&ref=a%ZZ');
+    expect(() => evaluate(ev!)).not.toThrow();
+  });
+});

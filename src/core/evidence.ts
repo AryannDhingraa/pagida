@@ -77,5 +77,6 @@ export function evidenceSignature(url: string, dom: DomEvidence): string {
     dom.clickFix ? 1 : 0, dom.clipboardCommand ? 1 : 0,
     dom.techSupportScam ? 1 : 0, dom.documentLure ? 1 : 0, dom.cryptoLure ? 1 : 0,
     dom.fakeAddressBar ?? '', dom.passwordFieldVisible ? 1 : 0,
+    Math.round((dom.textModelScore ?? 0) * 10),
   ].join('~');
 }

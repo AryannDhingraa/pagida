@@ -1,5 +1,78 @@
 # Evaluation
 
+## v6: email (4 November 2026)
+
+`scripts/evaluate-email.ts` runs the email engine over labelled mail and
+counts how often it would show a warning (any named reason) and how often that
+warning is "Likely phishing". Link checks are address-only and the blocklists
+are empty, which is what Pagida does offline. QR codes are not part of it (the
+corpora carry no images); the browser test below covers them.
+
+| Set | Emails | Warned | "Likely phishing" |
+|---|---:|---:|---:|
+| Phishing: Nazario 2025, never trained on | 481 | **75.5%** | 56.5% |
+| Same, without the reader's own address | 481 | 68.6% | 48.0% |
+| Phishing: Nazario 2024 (the model trained on it) | 403 | 67.5% | 56.3% |
+| Same, without the reader's own address | 403 | 61.5% | 47.9% |
+| Legitimate: SpamAssassin, held out from training | 844 | **0.1%** (1) | 0% |
+| Legitimate: all SpamAssassin mail (rules check) | 4,150 | 0.3% (11) | 0.02% (1) |
+
+How to read it:
+
+- **The reader's own address matters.** Every Nazario email was sent to one
+  person at one company, and a third of the 2025 set is "your company's IT
+  team" mail sent from somewhere else. Pagida catches that by comparing the
+  sender with your own domain, which it reads from Gmail's tab title or
+  Outlook's To line. A personal Gmail or Outlook.com reader has no company
+  domain to compare with, so the rows without it are the numbers for them.
+- **2025 was looked at while the rules were written**, so it is not a clean
+  test of the rules (it is a clean test of the model). 2024 was not looked at
+  for the rules, but the model trained on it. Neither is perfect; together
+  they bracket it.
+- **The legitimate mail is from 2002.** Held out means the model never trained
+  on it. Of the 11 warnings in the full set, 8 are links the web engine
+  flags (a `yahoo.comm` typo, a parody of microsoft.com, qmail.org as a
+  near-miss for gmail.com), and the one "Likely phishing" is an `index.html`
+  attached to a developer mailing list: harmless there, and exactly what an
+  attached phishing page looks like. Modern newsletters are the likeliest false alarm, which is
+  why the model can never warn on its own.
+
+What the 2025 warnings were, by top reason: your organisation's name from
+outside (168), a brand name on the wrong address (57), callback scams (37),
+wording plus an unknown link (31), fake mailbox notices (26), links to IPFS,
+buckets or free hosts (24), dangerous attachments (15), payment scams (4).
+
+What is still missed: fake receipts with no link and no phone number in the
+text (the number is in an image), well-crafted mail sent through real
+services (a real DocuSign or PayPal invoice with a scam in the note), and
+non-English lures the model has seen little of.
+
+**In the browser** (`tools/harness/mail-e2e.cjs`): mock Gmail and Outlook
+pages served as mail.google.com and outlook.office.com. A CommBank phish from
+Gmail, a fake Microsoft 365 password notice and a "mailbox full" notice to
+IPFS all got a "Likely phishing" card with their links held behind a confirm;
+a real CommBank statement and a real Microsoft renewal got nothing; a QR code
+in an image was read in the worker.
+
+**The models** (`scripts/train-text-models.py`), on held-out data: email AUC
+0.992, 96.6% precision and 94.0% recall at 0.5; web pages AUC 0.976, 85.3%
+precision and 91.2% recall, 6.9% false positives. The page model's false
+positive rate is why it only counts on unknown sites that ask for a secret.
+
+**The web engine, v5 against v6** (`tools/harness/compare.cjs`, same day,
+Pagida service off in both). On 345 real sites scored by both builds, v6 gave
+the same answer as v5 on every one but a single http-only site that moved from
+"Nothing found" to "Worth a look". That run found one "Likely phishing" on a
+real site in **both** builds: index.hu, whose hidden log-in box posts to its
+own account service on another domain. v6 now treats that as single sign-on on
+a top-10,000 site (a hacked site posting to a relay is still caught by the
+relay rule). On 194 live pages from that morning's OpenPhish feed, blocklists
+off, v6 flagged 178 (v5: 178), 86 at "Suspicious" or worse (v5: 84) and 8 at
+"Likely phishing" (v5: 7), and scored none lower than v5. All nine attack
+pages gave the same results as in v5.
+
+---
+
 ## v5: the whole engine, in a real browser (4 November 2026)
 
 The URL-only numbers further down never measured false alarms on real pages,

@@ -32,6 +32,8 @@ export interface Settings {
   /** Google Safe Browsing lookups. Off unless the user supplies their own key. */
   useSafeBrowsing: boolean;
   safeBrowsingKey: string;
+  /** Check emails opened in Gmail and Outlook on the web. All on this computer. */
+  checkEmail: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -44,6 +46,7 @@ export const DEFAULT_SETTINGS: Settings = {
   usePagidaService: true,
   useSafeBrowsing: false,
   safeBrowsingKey: '',
+  checkEmail: true,
 };
 
 /** A site the user has explicitly judged, one way or the other. */
@@ -68,7 +71,7 @@ export interface Stored {
   feedUrls: string[];
   feedUpdatedAt: number;
   /** Lifetime counters, shown on the options page. */
-  stats: { pagesScanned: number; warnings: number; reports: number };
+  stats: { pagesScanned: number; warnings: number; reports: number; emailsChecked: number };
 }
 
 export const STORAGE_DEFAULTS: Stored = {
@@ -78,7 +81,7 @@ export const STORAGE_DEFAULTS: Stored = {
   feedHosts: [],
   feedUrls: [],
   feedUpdatedAt: 0,
-  stats: { pagesScanned: 0, warnings: 0, reports: 0 },
+  stats: { pagesScanned: 0, warnings: 0, reports: 0, emailsChecked: 0 },
 };
 
 export async function getSettings(): Promise<Settings> {
