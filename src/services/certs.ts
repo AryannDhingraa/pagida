@@ -3,7 +3,7 @@
  *
  * This answers a question RDAP cannot: not "when was this domain bought?" but
  * "when did anyone first put a working website on it?". A domain registered
- * years ago and only certificated last week is a classic aged-domain purchase —
+ * years ago and only certificated last week is a classic aged-domain purchase,
  * bought precisely to defeat the domain-age check.
  *
  * crt.sh is free and keyless but slow and occasionally unavailable, so this is
@@ -17,7 +17,7 @@ export interface CertFacts {
   firstSeen?: string;
   /** Most recent certificate logged. */
   lastSeen?: string;
-  /** How many certificates in total — a real business has a long trail. */
+  /** How many certificates in total: a real business has a long trail. */
   total?: number;
   /** Distinct issuers, most recent first. */
   issuers?: string[];

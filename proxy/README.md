@@ -10,7 +10,7 @@ verdict. It stores nothing.
 ## Why Web Risk and not Safe Browsing
 
 The Safe Browsing API's free tier is **non-commercial use only**. Pagida is free
-and open source, so the extension itself is fine — but a shared server offering
+and open source, so the extension itself is fine. But a shared server offering
 the lookup to other people is a redistribution the terms do not allow, however
 free it is.
 
@@ -77,7 +77,7 @@ curl 'https://pagida-proxy.<your-subdomain>.workers.dev/v1/health'
 
 ## If the quota runs out
 
-The Worker returns `429` and the extension treats that as "no answer" — the
+The Worker returns `429` and the extension treats that as "no answer": the
 other twenty-one signals carry on and the user sees nothing. Failing invisibly
 is the correct behaviour here; a security tool that starts nagging about its own
 billing has lost the plot.

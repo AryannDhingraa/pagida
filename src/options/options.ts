@@ -1,8 +1,8 @@
 /**
  * Settings, and the first-run welcome.
  *
- * Everything here is written as Iris talking, because the alternative — a page
- * of technical toggles — is exactly what made the previous build unreadable to
+ * Everything here is written as Iris talking, because the alternative, a page
+ * of technical toggles, is exactly what made the previous build unreadable to
  * anyone who was not already a security person.
  *
  * The privacy copy is not marketing. It is the actual list of network calls the
@@ -11,7 +11,7 @@
  */
 import type { Sensitivity } from '../core/score.js';
 import type { UserMark } from '../shared/settings.js';
-import { clearMark, getMarks, getSettings, getStats, setSettings } from '../shared/settings.js';
+import { clearMark, getMarks, getPolicy, getSettings, getStats, setSettings } from '../shared/settings.js';
 import { attachScrollCompanion, Iris, injectIrisCss, type TagAlong } from '../ui/iris.js';
 import { Stepper, STEPPER_CSS, type Step } from '../ui/stepper.js';
 import type { Message } from '../shared/messages.js';
@@ -34,6 +34,9 @@ const controls = {
   useFeeds: $<HTMLInputElement>('useFeeds'),
   usePagidaService: $<HTMLInputElement>('usePagidaService'),
   checkEmail: $<HTMLInputElement>('checkEmail'),
+  rememberSignIns: $<HTMLInputElement>('rememberSignIns'),
+  useDmarc: $<HTMLInputElement>('useDmarc'),
+  rememberHistory: $<HTMLInputElement>('rememberHistory'),
   useSafeBrowsing: $<HTMLInputElement>('useSafeBrowsing'),
   safeBrowsingKey: $<HTMLInputElement>('safeBrowsingKey'),
   sbKeyRow: $<HTMLElement>('sbKeyRow'),
@@ -178,13 +181,16 @@ async function loadSettings(): Promise<void> {
   controls.useFeeds.checked = s.useFeeds;
   controls.usePagidaService.checked = s.usePagidaService;
   controls.checkEmail.checked = s.checkEmail;
+  controls.rememberSignIns.checked = s.rememberSignIns;
+  controls.useDmarc.checked = s.useDmarc;
+  controls.rememberHistory.checked = s.rememberHistory;
   controls.useSafeBrowsing.checked = s.useSafeBrowsing;
   controls.safeBrowsingKey.value = s.safeBrowsingKey;
   syncKeyRow();
 }
 
 function wire(): void {
-  const bind = (input: HTMLInputElement, key: 'enabled' | 'showBanner' | 'siteReport' | 'useRdap' | 'useFeeds' | 'usePagidaService' | 'useSafeBrowsing' | 'checkEmail') => {
+  const bind = (input: HTMLInputElement, key: 'enabled' | 'showBanner' | 'siteReport' | 'useRdap' | 'useFeeds' | 'usePagidaService' | 'useSafeBrowsing' | 'checkEmail' | 'rememberSignIns' | 'useDmarc' | 'rememberHistory') => {
     input.addEventListener('change', () => {
       void setSettings({ [key]: input.checked });
       if (key === 'enabled') {
@@ -200,6 +206,19 @@ function wire(): void {
   bind(controls.useFeeds, 'useFeeds');
   bind(controls.usePagidaService, 'usePagidaService');
   bind(controls.checkEmail, 'checkEmail');
+  bind(controls.rememberSignIns, 'rememberSignIns');
+  bind(controls.useDmarc, 'useDmarc');
+  bind(controls.rememberHistory, 'rememberHistory');
+  $('forget-history').addEventListener('click', (e) => {
+    e.preventDefault();
+    const button = e.currentTarget as HTMLButtonElement;
+    void chrome.runtime.sendMessage({ type: 'FORGET_HISTORY' } satisfies Message).then(() => { button.textContent = 'Forgotten'; });
+  });
+  $('forget-sign-ins').addEventListener('click', (e) => {
+    e.preventDefault();
+    const button = e.currentTarget as HTMLButtonElement;
+    void chrome.runtime.sendMessage({ type: 'FORGET_SIGN_INS' } satisfies Message).then(() => { button.textContent = 'Forgotten'; });
+  });
   bind(controls.useSafeBrowsing, 'useSafeBrowsing');
   controls.useSafeBrowsing.addEventListener('change', syncKeyRow);
 
@@ -322,3 +341,23 @@ async function init(): Promise<void> {
 }
 
 void init();
+
+// ---------------------------------------------------------------- policy
+
+/** Settings an organisation set by policy: shown, but not changeable here. */
+async function showLocked(): Promise<void> {
+  const { settings } = await getPolicy();
+  for (const key of Object.keys(settings)) {
+    const input = (controls as unknown as Record<string, HTMLElement | undefined>)[key];
+    if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement)) continue;
+    input.disabled = true;
+    const row = input.closest('.row') ?? input.parentElement;
+    if (row && !row.querySelector('.locked')) {
+      const note = document.createElement('small');
+      note.className = 'locked';
+      note.textContent = 'Set by your organisation';
+      row.appendChild(note);
+    }
+  }
+}
+void showLocked();

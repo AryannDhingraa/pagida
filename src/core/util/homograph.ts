@@ -1,5 +1,5 @@
 /**
- * Detection for IDN homograph attacks — domains that render as a familiar brand
+ * Detection for IDN homograph attacks: domains that render as a familiar brand
  * but are made of characters from a different alphabet.
  *
  * `аpple.com` with a Cyrillic а is a different domain to `apple.com` but is
@@ -45,7 +45,7 @@ export function scriptsIn(s: string): string[] {
 }
 
 /**
- * True when a single label mixes alphabets — the classic homograph tell.
+ * True when a single label mixes alphabets, the classic homograph tell.
  * A domain that is entirely Cyrillic is legitimate; one that is Latin with two
  * Cyrillic characters hidden in it is not.
  */
@@ -67,7 +67,7 @@ export function skeleton(s: string): string {
   return out;
 }
 
-/** True when folding confusables changes the string — i.e. it contained some. */
+/** True when folding confusables changes the string, meaning it contained some. */
 export function hasConfusables(s: string): boolean {
   return skeleton(s) !== s.toLowerCase().normalize('NFKC');
 }

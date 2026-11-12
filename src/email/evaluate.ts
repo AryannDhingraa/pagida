@@ -24,10 +24,12 @@ import { bandRank, higherBand } from '../core/conclusions.js';
 import { BRAND_DOMAINS, domainsForToken, isWellKnown } from '../core/data/index.js';
 import { wholeWordTokens } from '../core/brandText.js';
 import { brandName } from '../core/identity.js';
+import { forgeable } from '../core/dmarc.js';
 import type { EmailEvidence, EmailVerdict, LinkFinding } from './types.js';
 import {
   FREE_MAIL, TRACKING_DOMAINS, anonymousHost, asksForPayment, asksToCall, asksToVerify, attachmentRisk,
   linkTextHost, sharesDocument, talksAboutMailbox, transactionNotice,
+  RELAY_SENDERS,
 } from './patterns.js';
 
 const reg = (host: string): string => parseHost(host).registrableDomain;
@@ -115,7 +117,8 @@ function readerOrg(e: EmailEvidence): { domain: string; label: string } | null {
 export function evaluateEmail(e: EmailEvidence, findings: LinkFinding[]): EmailVerdict {
   const domain = senderDomain(e.fromAddress);
   const free = FREE_MAIL.has(domain);
-  const known = !free && (BRAND_DOMAINS.has(domain) || isWellKnown(domain));
+  const orgOwn = (d: string): boolean => (e.orgDomains ?? []).some((o) => d === o || d.endsWith(`.${o}`));
+  const known = !free && (BRAND_DOMAINS.has(domain) || isWellKnown(domain) || orgOwn(domain));
   const signals: Signal[] = [];
   const conclusions: Conclusion[] = [];
   const add = (s: Signal): void => { signals.push(s); };
@@ -209,6 +212,26 @@ export function evaluateEmail(e: EmailEvidence, findings: LinkFinding[]): EmailV
       conclude({ id: 'fake_internal_sender', title: `This is not from ${org.domain}`,
         detail: `It uses your organisation's name, but it was sent from ${domain || 'an outside address'}. Your own IT team would write from ${org.domain}.`,
         floor: 'danger', because: ['sender_claims_reader_org'] });
+    }
+  }
+
+  // The real address, but one anyone can send as. Gmail and Outlook refuse
+  // forged mail from a domain that asks them to (DMARC reject or quarantine),
+  // so a forged "from your own company" email only reaches the inbox when the
+  // domain has no such policy. Then the address proves nothing.
+  const ownOrgAddress = (!!org && domain === org.domain) || (e.orgDomains ?? []).some((o) => domain === o || domain.endsWith(`.${o}`));
+  const brandAddress = BRAND_DOMAINS.has(reg(domain));
+  if (forgeable(e.senderDmarc) && (ownOrgAddress || brandAddress) && wantsAction) {
+    const home = reg(domain);
+    const away = e.links.filter((l) => { const d = reg(hostOf(l.href)); return !!d && d !== home && offBrand(l.href) && !(e.orgDomains ?? []).includes(d); });
+    if (away.length > 0 || e.attachments.length > 0) {
+      add({ id: 'sender_address_forgeable', title: `${domain} does not protect its address from forgery`,
+        detail: `${home} has no rule telling mail servers to refuse fake mail in its name, so this address could have been typed by anyone.`,
+        tier: 'dom', weight: 20 });
+      const where = away[0] ? `to ${reg(hostOf(away[0].href))}` : 'to open an attachment';
+      conclude({ id: 'forgeable_sender', title: `This email may not really be from ${domain}`,
+        detail: `Anyone can send mail that shows ${domain} as the sender, because ${home} does not ask mail servers to block forgeries. This one wants you to act, and sends you ${where}. Check with the sender another way, by phone or a message you start yourself, before you click.`,
+        floor: 'suspicious', because: ['sender_address_forgeable'] });
     }
   }
 
@@ -357,10 +380,16 @@ export function evaluateEmail(e: EmailEvidence, findings: LinkFinding[]): EmailV
     add({ id: 'callback_lure', title: 'Wants you to phone about a charge',
       detail: 'It names an amount, says to call if it was not you, and gives a number. Fake receipts work this way: the person who answers asks for remote access to your computer or your card.',
       tier: 'dom', weight: 18 });
+    const service = RELAY_SENDERS.get(reg(domain));
     if (!known || impostor) {
       conclude({ id: 'callback_scam', title: 'This email wants you to call a number about a charge',
         detail: 'Do not call the number in this email. If you are worried about a charge, check your account on the official site or app, or call the number on the back of your card.',
         floor: impostor ? 'danger' : 'suspicious', because: ['callback_lure'] });
+    } else if (service) {
+      // The real service sent it, so every sender check passes. The words are a stranger's.
+      conclude({ id: 'callback_through_service', title: `${service} really sent this, but the note in it is a scam`,
+        detail: `Anyone can send an invoice or request through ${service} and write their own message in it. This one names a charge, says to call if it was not you, and gives a number. ${service} does not ask you to phone a number written in an invoice. Do not call it. Open ${service} yourself to check.`,
+        floor: 'suspicious', because: ['callback_lure'] });
     }
   }
   if (docShare && !known && offBrandLinks.length > 0) {

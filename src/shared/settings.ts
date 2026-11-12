@@ -24,7 +24,7 @@ export interface Settings {
   /**
    * Ask the Pagida service whether a domain is on Google's threat lists.
    *
-   * Sends a bare domain name — never the address of the page. On by default,
+   * Sends a bare domain name, never the address of the page. On by default,
    * because the people this protects are the ones who will never find a
    * settings screen; one switch here turns it off for good.
    */
@@ -34,6 +34,12 @@ export interface Settings {
   safeBrowsingKey: string;
   /** Check emails opened in Gmail and Outlook on the web. All on this computer. */
   checkEmail: boolean;
+  /** Remember, on this computer, which sites the person signs in to, to spot copies of them. */
+  rememberSignIns: boolean;
+  /** Look up whether your organisation's email address can be forged (DMARC). Sends that domain name only. */
+  useDmarc: boolean;
+  /** Keep a scrambled, on-device memory of the sites you use and how you reached them. */
+  rememberHistory: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -47,6 +53,9 @@ export const DEFAULT_SETTINGS: Settings = {
   useSafeBrowsing: false,
   safeBrowsingKey: '',
   checkEmail: true,
+  rememberSignIns: true,
+  useDmarc: true,
+  rememberHistory: true,
 };
 
 /** A site the user has explicitly judged, one way or the other. */
@@ -84,9 +93,37 @@ export const STORAGE_DEFAULTS: Stored = {
   stats: { pagesScanned: 0, warnings: 0, reports: 0, emailsChecked: 0 },
 };
 
+/**
+ * What an organisation has set through Chrome policy (managed storage).
+ * Empty on a personal install. A key present here wins over the person's own
+ * choice and is shown as locked in Options.
+ */
+export interface Policy { settings: Partial<Settings>; orgDomains: string[] }
+
+const POLICY_KEYS = new Set<keyof Settings>(['enabled', 'sensitivity', 'showBanner', 'siteReport', 'useRdap', 'useFeeds', 'usePagidaService', 'checkEmail', 'rememberSignIns', 'useDmarc', 'rememberHistory']);
+
+export async function getPolicy(): Promise<Policy> {
+  try {
+    const raw = await chrome.storage.managed.get(['settings', 'orgDomains']) as { settings?: Record<string, unknown>; orgDomains?: unknown };
+    const settings: Partial<Settings> = {};
+    for (const [k, v] of Object.entries(raw.settings ?? {})) {
+      if (POLICY_KEYS.has(k as keyof Settings) && typeof v === typeof DEFAULT_SETTINGS[k as keyof Settings]) {
+        (settings as Record<string, unknown>)[k] = v;
+      }
+    }
+    const orgDomains = Array.isArray(raw.orgDomains)
+      ? raw.orgDomains.filter((d): d is string => typeof d === 'string').map((d) => d.trim().toLowerCase().replace(/^\*?\./, '')).filter(Boolean)
+      : [];
+    return { settings, orgDomains };
+  } catch {
+    // No policy support here (or none set): a personal install.
+    return { settings: {}, orgDomains: [] };
+  }
+}
+
 export async function getSettings(): Promise<Settings> {
-  const { settings } = await chrome.storage.local.get('settings');
-  return { ...DEFAULT_SETTINGS, ...(settings ?? {}) };
+  const [{ settings }, policy] = await Promise.all([chrome.storage.local.get('settings'), getPolicy()]);
+  return { ...DEFAULT_SETTINGS, ...(settings ?? {}), ...policy.settings };
 }
 
 export async function setSettings(patch: Partial<Settings>): Promise<Settings> {

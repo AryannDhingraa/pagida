@@ -3,9 +3,10 @@
 const { chromium } = require('playwright');
 const fs = require('fs');
 const EXT = require('path').resolve(process.env.EXT || 'dist');
-const pages = ['clickfix', 'devdocs', 'mslogin', 'seed', 'tech', 'bitb', 'telegram', 'shop', 'cbank'];
+const pages = ['clickfix', 'devdocs', 'mslogin', 'seed', 'tech', 'bitb', 'telegram', 'shop', 'cbank', 'framecopy'];
 (async () => {
   const ctx = await chromium.launchPersistentContext(fs.mkdtempSync(require('path').join(require('os').tmpdir(), 'pagida-')), {
+    ...(process.env.CHROME ? { executablePath: process.env.CHROME } : {}),
     headless: false,
     args: ['--headless=new', `--disable-extensions-except=${EXT}`, `--load-extension=${EXT}`,
       '--host-resolver-rules=MAP *.pagidatest.com 127.0.0.1', ...(process.env.HTTPS_PROXY ? ['--proxy-server=' + process.env.HTTPS_PROXY] : []), '--proxy-bypass-list=*.pagidatest.com;127.0.0.1', '--unsafely-treat-insecure-origin-as-secure=' + pages.map(n => `http://${n}-site.pagidatest.com:8098`).join(',')],

@@ -117,6 +117,19 @@ const MONEY = /[$€£]\s?\d{1,3}(?:[,.]\d{3})*(?:[.,]\d{2})?|\b\d+(?:[.,]\d{2})
 const NOT_YOU = /\b(?:did\s*n[o']?t|do\s+not|didn['’]t|never)\s+(?:make|authori[sz]e|recogni[sz]e|place|request|order|initiate|purchase)|\bnot\s+(?:you|authori[sz]ed|recogni[sz]ed)\b|\bunauthori[sz]ed\b|\bcancel\w*\s+(?:this|the|your)\s+(?:order|transaction|payment|charge|purchase|renewal|plan|membership)\b|\bto\s+cancel\b(?![^.\n]{0,40}newsletter)|\brefund\b|\bdispute\b|\bauto.?renew/i;
 const CALL = /\b(?:call|contact|reach|dial|phone|ring)\b[^.\n]{0,80}\d{3}|\b(?:helpline|help\s+line|toll.?free|support\s+(?:number|line|desk)|customer\s+(?:care|service)\s+(?:number|line))\b/i;
 
+/**
+ * Services that send a message a stranger wrote, from their own real address:
+ * a PayPal invoice or money request, a DocuSign envelope, a QuickBooks or Xero
+ * invoice. The sender checks pass because the service really sent it, and the
+ * scam sits in the note. Registrable domain → the name people know.
+ */
+export const RELAY_SENDERS: ReadonlyMap<string, string> = new Map([
+  ['paypal.com', 'PayPal'], ['paypal.com.au', 'PayPal'], ['paypal.co.uk', 'PayPal'],
+  ['docusign.net', 'DocuSign'], ['docusign.com', 'DocuSign'],
+  ['intuit.com', 'QuickBooks'], ['squareup.com', 'Square'], ['xero.com', 'Xero'],
+  ['freshbooks.com', 'FreshBooks'], ['waveapps.com', 'Wave'], ['stripe.com', 'Stripe'],
+]);
+
 export function asksToCall(text: string): boolean {
   return PHONE.test(text) && MONEY.test(text) && NOT_YOU.test(text) && CALL.test(text);
 }

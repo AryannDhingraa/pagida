@@ -36,6 +36,59 @@ sentence.
   and the last warning.
 - Switch it off in Options: *Check my emails*.
 
+### Copies of the sites you use
+- **"This looks like your bank, but it is a different site."** When you sign
+  in on a page Pagida already checked, it remembers that site's name and the
+  look of its tab icon, on this computer only. A different site wearing the
+  same icon and asking for a password is called out by name. This covers the
+  banks, councils and work sign-in pages no brand list knows. Off switch and
+  a wipe button in Options: *Remember where I sign in*.
+- **Scam notes sent through real services.** A PayPal, DocuSign, QuickBooks,
+  Xero or Square message that names a charge and says to phone a number if it
+  was not you is flagged, even though the service really sent it.
+- **When Pagida cannot read your mailbox, it says so.** If Gmail or Outlook
+  change their layout and an open email cannot be read, the popup says
+  "I cannot read the email that is open" instead of staying quiet.
+
+### Knows the context
+- **A private memory of the sites you use.** A site you have used on several
+  days over weeks, with no warning ever, stops being judged by guesswork. Each
+  Google Doc, Form, Drive file or free-hosted site is remembered on its own,
+  so your team's Doc says nothing about a stranger's. Stored on this computer
+  under a keyed hash with a key the browser keeps locked; forgotten after six
+  months. Options: *Get to know the sites I use*.
+- **Knows when you came from an email.** A page opened from an email Pagida
+  warned about inherits that warning, even a page that looks clean on its own.
+- **Passwords in online forms.** A Google Form or Microsoft Form asking for
+  your email and password is called out.
+- **Official sites.** Addresses only governments and universities can
+  register (gov.au, gov.uk, gov.in, go.jp, edu and others) are never judged by
+  guesswork, so new official sites and other countries' portals stop raising
+  false alarms. Scam lists still apply.
+- **Can this address be faked?** For emails claiming to come from your own
+  organisation or a known brand, Pagida checks whether that domain blocks
+  forged mail (DMARC). Brand answers are built in.
+- **Company settings.** IT can set and lock Pagida's settings and list the
+  organisation's own domains through Chrome policy.
+- **Sign-in pages on free website hosts** are named for what they are.
+
+### Faster
+- Pages are read as soon as their content is there, not after every image and
+  advert has loaded, and a page that is clearly an attack is answered without
+  waiting for the domain-age lookup. On a first visit the median time to a
+  verdict went from about 1 second to about 0.15 seconds, and copied sign-in
+  pages are flagged in 0.14 seconds instead of 4.2, with no verdict changed.
+
+### Security
+- The ClickFix guard now covers frames. A page could copy its command
+  through a hidden frame it made on the spot and get past the guard.
+- A page can no longer erase the command Pagida saw it copy.
+- Content scripts can only speak for the page they run in, and only the
+  webmail sites can send email results.
+- QR images in an email are never fetched from your home or office network.
+- The Pagida service caps each network at 150 lookups a day, so one person
+  cannot spend everyone's allowance. Its request logs are off.
+
 ### Popup and report
 - "Nothing found" no longer sits above "Worth a look rather than an alarm".
 - The site facts no longer stay on "checking…": the connection shows at once,
@@ -47,17 +100,25 @@ sentence.
 ### Trained models
 - **Email model**: trained on the Nazario phishing corpus (2019 to 2024),
   ealvaradob/phishing-dataset and the SpamAssassin public corpus. Tested on
-  Nazario 2025 and held-out SpamAssassin mail it never saw: AUC 0.992. It
-  runs in the tab and only counts together with the shape of a phishing email.
+  Nazario 2025 and held-out SpamAssassin mail it never saw: AUC 0.993, 94.9%
+  of phishing caught, 1.77% of normal mail scored as phishing. It runs in the
+  tab and only counts together with the shape of a phishing email.
 - **Page model**: trained on the same Hugging Face dataset's web pages (AUC
-  0.976). Used only on unknown sites that ask for a password, card or code.
+  0.979, 92.4% caught, 6.75% false positives). Used only on unknown sites
+  that ask for a password, card or code.
+- Both models now keep their 12,000 strongest weights instead of 6,000. On
+  the same held-out data that caught more and flagged less on both: emails
+  94.0% to 94.9% caught with false positives down from 1.98% to 1.77%, pages
+  91.2% to 92.4% caught with false positives down from 6.90% to 6.75%. The
+  whole email engine now warns on 75.7% of 2025 phishing (was 75.5%) with the
+  same single false warning in 844 held-out normal emails.
 
 ### Fixes
 - A link or page address with a stray `%` no longer stops the whole check.
 - The page script is smaller (269 KB, down from 365 KB in v5): the wording
   moved out of the scoring module, so the page no longer bundles the allowlist.
 
-## 5.0.0 — November 2026: the offline engine
+## 5.0.0, November 2026: the offline engine
 
 Pagida now catches phishing on its own, on your computer. The Google lookup
 through the Pagida service is a backup, asked about far fewer sites.

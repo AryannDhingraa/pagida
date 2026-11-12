@@ -1,10 +1,11 @@
 /**
- * Service worker — the orchestrator.
+ * Service worker: the orchestrator.
  *
  * MV3 workers are killed aggressively, so nothing important lives in a module
  * variable. Verdicts are held in a small in-memory map purely as a cache; if
  * the worker dies the popup simply asks the tab to re-report.
  */
+import type { ReaderState } from '../email/health.js';
 import type { DomEvidence, PageEvidence, Verdict } from '../core/types.js';
 import { evidenceFromUrl, isAnalysable } from '../core/evidence.js';
 import { BAND_NAME, evaluate, summarise } from '../core/score.js';
@@ -17,7 +18,10 @@ import { safeBrowsingLookup } from '../services/safebrowsing.js';
 import { lookupReputation } from '../services/pagidaApi.js';
 import { forget, rememberClean, rememberedClean, bumpLookupStat } from '../services/memory.js';
 import { blocklistSize, getIndex, listed, refreshBlocklist } from '../services/blocklist.js';
-import { logoBrands } from '../services/logo.js';
+import { faviconHash, logoBrands } from '../services/logo.js';
+import { forgetSignIns, noteSignIn, siteThisCopies } from '../services/signins.js';
+import { bundledDmarc, lookupDmarc } from '../services/dmarc.js';
+import { familiarityOf, forgetHistory, rememberVisit } from '../services/history.js';
 import { decodeQr } from '../services/qr.js';
 import { checkLink, evaluateEmail, senderDomain } from '../email/evaluate.js';
 import { FREE_MAIL } from '../email/patterns.js';
@@ -25,7 +29,7 @@ import type { EmailEvidence, LinkFinding } from '../email/types.js';
 import { buildReport, type TechFacts } from '../services/report.js';
 import { animateIcon, setIconBand } from './icon.js';
 import {
-  bumpStat, clearMark, getMarks, getSettings, setMark, STORAGE_DEFAULTS,
+  bumpStat, clearMark, getMarks, getPolicy, getSettings, setMark, STORAGE_DEFAULTS,
 } from '../shared/settings.js';
 import type { Message } from '../shared/messages.js';
 
@@ -108,6 +112,27 @@ async function paintBadge(tabId: number, verdict: Verdict, animate = false): Pro
 // ---------------------------------------------------------------- scoring
 
 /**
+ * Links clicked in an email Pagida checked, by destination hostname, for two
+ * minutes: long enough for the page to load in a new tab, short enough that a
+ * later, unrelated visit is not taken as coming from that email.
+ */
+const ARRIVAL_MS = 2 * 60 * 1000;
+const arrivals = new Map<string, { at: number; band: Verdict['band']; warned: boolean }>();
+function noteArrival(href: string, band: Verdict['band'], warned: boolean): void {
+  try {
+    const host = new URL(href).hostname.toLowerCase();
+    if (arrivals.size > 50) arrivals.clear();
+    arrivals.set(host, { at: Date.now(), band, warned });
+  } catch { /* not a URL */ }
+}
+function takeArrival(hostname: string): { band: Verdict['band']; warned: boolean } | undefined {
+  const a = arrivals.get(hostname.toLowerCase());
+  if (!a) return undefined;
+  if (Date.now() - a.at > ARRIVAL_MS) { arrivals.delete(hostname); return undefined; }
+  return a;
+}
+
+/**
  * Score a URL, optionally with page evidence. Every enrichment step is
  * independently optional and independently allowed to fail.
  */
@@ -117,6 +142,15 @@ async function score(url: string, dom?: DomEvidence): Promise<Verdict | null> {
 
   const settings = await getSettings();
   const evidence: PageEvidence = { ...base, dom: dom ? { ...dom } : undefined };
+
+  // This person's own history with the site, and whether they just clicked
+  // here from an email. Both stay on this computer.
+  if (settings.rememberHistory) {
+    const seen = await familiarityOf(url);
+    if (seen) evidence.history = seen;
+  }
+  const click = takeArrival(base.hostname);
+  if (click) evidence.arrival = { fromEmail: true, emailBand: click.band, emailWarned: click.warned };
 
   // User's own call on this host, if any.
   const marks = await getMarks();
@@ -147,20 +181,45 @@ async function score(url: string, dom?: DomEvidence): Promise<Verdict | null> {
     if (index) evidence.blocklistHit = listed(index, base.hostname);
   }
 
+  // The organisation's own sites: treated like a site the person marked safe,
+  // after the local lists have had their say (a confirmed match still shows).
+  const { orgDomains } = await getPolicy();
+  if (orgDomains.some((d) => registrableDomain === d || base.hostname.endsWith(`.${d}`))) {
+    evidence.userTrusted = true;
+    return evaluate(evidence, opts);
+  }
+
+  // Domain age is the slowest local step (a registry lookup, cached for a
+  // week). Start it now and let it run while the on-page checks happen.
+  const agePromise = settings.useRdap && !known ? domainAgeDays(base.hostname).catch(() => undefined) : Promise.resolve(undefined);
+
   // Logo matching only where it can change the answer: an unknown site that
   // asks for a secret or behaves like a lure.
   if (evidence.dom && !known) {
     const d = evidence.dom;
     const worthIt = d.hasPasswordField || d.asksCard || d.asksOneTimeCode || d.asksSeedPhrase || d.documentLure || d.cryptoLure;
-    if (worthIt) d.logoBrands = await logoBrands(d.faviconUrl);
+    const [brands, icon] = await Promise.all([
+      worthIt ? logoBrands(d.faviconUrl) : Promise.resolve([]),
+      d.hasPasswordField && settings.rememberSignIns && !isSharedHost(base.hostname, sld, known) ? faviconHash(d.faviconUrl) : Promise.resolve(null),
+    ]);
+    if (worthIt) d.logoBrands = brands;
+    // Does it wear the icon of a site this person really signs in to?
+    if (icon) {
+      const copied = await siteThisCopies(registrableDomain, icon);
+      if (copied) d.copiesSignInSite = copied;
+    }
   }
 
-  // Domain age: free (rdap.org, not the Pagida service) and cached for a
-  // week, so it is part of the local picture. Top sites are old by definition.
-  if (settings.useRdap && !known) {
-    const age = await domainAgeDays(base.hostname);
-    if (age !== undefined) evidence.domainAgeDays = age;
+  // A page the on-page checks already call an attack is answered now. Age can
+  // only lower a guess, never a named reason, so waiting for it changes nothing.
+  const early = evaluate(evidence, opts);
+  if (early.conclusions.some((c) => c.floor === 'danger')) {
+    await forget(base.hostname);
+    return early;
   }
+
+  const age = await agePromise;
+  if (age !== undefined) evidence.domainAgeDays = age;
 
   const first = evaluate(evidence, opts);
   const namedReason = first.conclusions.some((c) => c.floor === 'danger');
@@ -186,7 +245,7 @@ async function score(url: string, dom?: DomEvidence): Promise<Verdict | null> {
   } else if (settings.usePagidaService) {
     void bumpLookupStat('skipped');
   }
-  // Safe Browsing — sends the full URL, so it is opt-in with the user's key.
+  // Safe Browsing sends the full URL, so it is opt-in with the user's key.
   if (settings.useSafeBrowsing && settings.safeBrowsingKey && !namedReason) {
     const hit = await safeBrowsingLookup(url, settings.safeBrowsingKey);
     if (hit !== undefined) evidence.safeBrowsingHit = hit;
@@ -210,7 +269,7 @@ async function score(url: string, dom?: DomEvidence): Promise<Verdict | null> {
  * matter) domain ages and Google's threat lists for the unknown domains.
  */
 /** What the popup shows on a webmail tab: how many emails were checked there, and the last warning. */
-interface MailStatus { checked: number; warned: number; last?: { band: string; title: string; from: string } }
+interface MailStatus { checked: number; warned: number; reader?: ReaderState; last?: { band: string; title: string; from: string } }
 const mailStatus = new Map<number, MailStatus>();
 
 const hostOf = (href: string): string => { try { return new URL(href).hostname.toLowerCase(); } catch { return ''; } };
@@ -232,7 +291,16 @@ async function scoreEmail(email: EmailEvidence, imageUrls: string[]) {
     } catch { /* not a URL */ }
     return f;
   });
-  let verdict = evaluateEmail({ ...email, qrUrls }, findings);
+  const { orgDomains } = await getPolicy();
+  // Can the sender's address be forged? Bundled for brands; for the reader's
+  // own organisation, asked once a month (only that domain name is sent).
+  const sender = senderDomain(email.fromAddress);
+  const readerDomain = senderDomain(email.toAddress ?? '');
+  const ownOrg = !!sender && !FREE_MAIL.has(sender) && (
+    parseHost(sender).registrableDomain === parseHost(readerDomain).registrableDomain
+    || orgDomains.some((o) => sender === o || sender.endsWith(`.${o}`)));
+  const senderDmarc = bundledDmarc(sender) ?? (ownOrg && settings.useDmarc ? await lookupDmarc(sender) : undefined);
+  let verdict = evaluateEmail({ ...email, qrUrls, orgDomains, senderDmarc }, findings);
 
   // ---- Online checks, only while they can still change the answer. ----
   // Only domain names leave the computer, never the email or a full link:
@@ -271,7 +339,7 @@ async function scoreEmail(email: EmailEvidence, imageUrls: string[]) {
       }));
     };
     await Promise.all([ages(), lists()]);
-    if (changed) verdict = evaluateEmail({ ...email, qrUrls, domainAges }, findings);
+    if (changed) verdict = evaluateEmail({ ...email, qrUrls, domainAges, orgDomains, senderDmarc }, findings);
   }
 
   await bumpStat('emailsChecked');
@@ -281,9 +349,30 @@ async function scoreEmail(email: EmailEvidence, imageUrls: string[]) {
 
 // ---------------------------------------------------------------- messages
 
+const MAIL_HOSTS = new Set(['mail.google.com', 'outlook.live.com', 'outlook.office.com', 'outlook.office365.com']);
+
+/**
+ * A content script may only speak for the page it runs in. Pagida's own pages
+ * (popup, options, report) may ask about any address. This costs nothing in
+ * normal use and means a page that somehow got hold of a content script's
+ * voice still could not mark another site as safe, or pose as a mailbox.
+ */
+function speaksForItself(msg: Message, sender: chrome.runtime.MessageSender): boolean {
+  if (!sender.tab) return true;
+  const from = sender.url ?? sender.tab.url ?? '';
+  if (from.startsWith(chrome.runtime.getURL(''))) return true;
+  let host: string;
+  try { host = new URL(from).hostname; } catch { return false; }
+  if (msg.type === 'EMAIL_SIGNALS' || msg.type === 'MAIL_HEALTH' || msg.type === 'EMAIL_LINK_OPENED') return MAIL_HOSTS.has(host);
+  const claimed = (msg as { url?: unknown }).url;
+  if (typeof claimed !== 'string') return true;
+  try { return new URL(claimed).hostname === host; } catch { return false; }
+}
+
 chrome.runtime.onMessage.addListener((msg: Message, sender, sendResponse) => {
   void (async () => {
     try {
+      if (!speaksForItself(msg, sender)) return sendResponse({ ok: false, error: 'wrong-sender' });
       switch (msg.type) {
         case 'PAGE_SIGNALS': {
           const settings = await getSettings();
@@ -306,10 +395,11 @@ chrome.runtime.onMessage.addListener((msg: Message, sender, sendResponse) => {
 
           verdictCache.set(tabId, verdict);
           await paintBadge(tabId, verdict, isNewPage);
+          if (isNewPage && settings.rememberHistory) void rememberVisit(msg.url, verdict.conclusions.length > 0 || verdict.band === 'danger');
           if (isNewPage) await bumpStat('pagesScanned');
 
           // Iris steps onto the page from "suspicious" upward, not only at the
-          // top band — the old build stayed silent through the whole middle of
+          // top band, the old build stayed silent through the whole middle of
           // the range, which is where most real judgement calls live.
           // Iris only steps onto the page when the engine can say WHY in one
           // sentence: a conclusion or a confirmed match. Heuristics alone
@@ -361,6 +451,41 @@ chrome.runtime.onMessage.addListener((msg: Message, sender, sendResponse) => {
             }
           }
           return sendResponse({ ok: true, verdict });
+        }
+
+        case 'SIGNED_IN': {
+          const settings = await getSettings();
+          const tabId = sender.tab?.id;
+          if (!settings.enabled || !settings.rememberSignIns || tabId === undefined) return sendResponse({ ok: true });
+          // Learn only from pages already judged fine, so a phishing page can
+          // never teach Pagida that it is one of your sites.
+          const verdict = verdictCache.get(tabId);
+          if (!verdict || verdict.conclusions.length > 0 || (verdict.band !== 'clean' && verdict.band !== 'caution')) return sendResponse({ ok: true });
+          const { hostname } = new URL(msg.url);
+          const { sld, registrableDomain } = parseHost(hostname);
+          const known = BRAND_DOMAINS.has(registrableDomain) || isWellKnown(registrableDomain);
+          if (isPrivateHost(hostname) || isSharedHost(hostname, sld, known)) return sendResponse({ ok: true });
+          const icon = await faviconHash(msg.faviconUrl);
+          if (icon) await noteSignIn(registrableDomain, icon);
+          return sendResponse({ ok: true });
+        }
+
+        case 'EMAIL_LINK_OPENED': {
+          noteArrival(msg.href, msg.band, msg.warned);
+          return sendResponse({ ok: true });
+        }
+
+        case 'FORGET_HISTORY': {
+          if (!(sender.url ?? '').startsWith(chrome.runtime.getURL(''))) return sendResponse({ ok: false, error: 'wrong-sender' });
+          await forgetHistory();
+          return sendResponse({ ok: true });
+        }
+
+        case 'FORGET_SIGN_INS': {
+          // Only Pagida's own Options page may wipe it, never a web page's script.
+          if (!(sender.url ?? '').startsWith(chrome.runtime.getURL(''))) return sendResponse({ ok: false, error: 'wrong-sender' });
+          await forgetSignIns();
+          return sendResponse({ ok: true });
         }
 
         case 'UNMARK_SITE': {
@@ -435,13 +560,23 @@ chrome.runtime.onMessage.addListener((msg: Message, sender, sendResponse) => {
           return sendResponse({ ok: true, verdict, findings });
         }
 
+        case 'MAIL_HEALTH': {
+          const tabId = sender.tab?.id;
+          if (tabId !== undefined) {
+            const st = mailStatus.get(tabId) ?? { checked: 0, warned: 0 };
+            st.reader = msg.state;
+            mailStatus.set(tabId, st);
+          }
+          return sendResponse({ ok: true });
+        }
+
         case 'GET_MAIL_STATUS': {
           const settings = await getSettings();
           return sendResponse({ ok: true, mail: { on: settings.enabled && settings.checkEmail, ...(mailStatus.get(msg.tabId) ?? { checked: 0, warned: 0 }) } });
         }
 
         case 'RESCAN':
-          // Not for the worker — the popup sends this straight to the tab.
+          // Not for the worker. The popup sends this straight to the tab.
           return sendResponse({ ok: false, error: 'wrong-recipient' });
 
         default:
@@ -520,6 +655,9 @@ chrome.runtime.onInstalled.addListener((details) => {
     if (details.reason === 'install') {
       void chrome.tabs.create({ url: chrome.runtime.getURL('options.html?welcome=1') });
     }
+    // People upgrading from before 6.0 get one line in the popup about email checking.
+    const before = Number((details.previousVersion ?? '').split('.')[0]);
+    if (details.reason === 'update' && before > 0 && before < 6) await chrome.storage.local.set({ whatsNew: '6.0' });
   })();
 });
 

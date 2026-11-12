@@ -13,6 +13,7 @@ const SITES = process.env.SITES, OUT = process.env.OUT, CONC = Number(process.en
 const sites = fs.readFileSync(SITES, 'utf8').split('\n').filter(Boolean);
 (async () => {
   const ctx = await chromium.launchPersistentContext(fs.mkdtempSync(require('path').join(require('os').tmpdir(), 'pagida-')), {
+    ...(process.env.CHROME ? { executablePath: process.env.CHROME } : {}),
     headless: false,
     args: ['--headless=new', `--disable-extensions-except=${A},${B}`, `--load-extension=${A},${B}`,
       ...(process.env.HTTPS_PROXY ? ['--proxy-server=' + process.env.HTTPS_PROXY] : []), '--proxy-bypass-list=127.0.0.1;localhost', '--lang=en-AU'],
@@ -60,6 +61,12 @@ const sites = fs.readFileSync(SITES, 'utf8').split('\n').filter(Boolean);
       const finalUrl = page.url();
       const meta = await page.evaluate(() => ({ title: document.title, pw: !!document.querySelector('input[type=password]'), len: document.body ? document.body.innerText.length : 0 })).catch(() => ({}));
       const row = { url, finalUrl, err, ...meta };
+      // SAVE_TEXT=file.jsonl keeps each page's title and visible text, the same
+      // text the page model scores, for testing or training the model later.
+      if (process.env.SAVE_TEXT) {
+        const text = await page.evaluate(() => `${document.title}\n${(document.body?.innerText ?? '').slice(0, 20000)}`).catch(() => '');
+        if (text.length > 80) fs.appendFileSync(process.env.SAVE_TEXT, JSON.stringify({ url, finalUrl, pw: meta.pw, text }) + '\n');
+      }
       for (const [k, p] of Object.entries(probes)) {
         const v = await p.evaluate(async (u) => {
           const tabs = await chrome.tabs.query({});

@@ -1,7 +1,7 @@
 {
   "name": "pagida",
   "version": "6.0.0",
-  "description": "Pagida — explainable, local-first phishing detection for Chrome. Scores every page you visit against 20+ weighted signals and tells you exactly why.",
+  "description": "Pagida: explainable, local-first phishing detection for web pages and webmail. Checks every page and email you open and tells you in one sentence why.",
   "type": "module",
   "private": true,
   "license": "MIT",
@@ -18,13 +18,16 @@
     "build": "node scripts/build.mjs",
     "dev": "node scripts/build.mjs --watch",
     "zip": "node scripts/build.mjs && cd dist && zip -qr ../pagida-v$npm_package_version.zip . && cd .. && echo \"packaged pagida-v$npm_package_version.zip\"",
+    "zip:firefox": "TARGET=firefox node scripts/build.mjs && cd dist-firefox && zip -qr ../pagida-v$npm_package_version-firefox.zip . && cd .. && echo \"packaged pagida-v$npm_package_version-firefox.zip\"",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src scripts test --ext .ts,.mjs",
     "evaluate": "node scripts/run-ts.mjs scripts/evaluate.ts",
     "build:allowlist": "node scripts/run-ts.mjs scripts/build-allowlist.ts",
-    "build:psl": "node scripts/build-psl.mjs"
+    "build:dmarc": "node scripts/run-ts.mjs scripts/build-dmarc.ts",
+    "build:psl": "node scripts/build-psl.mjs",
+    "try": "node tools/harness/try-it.cjs"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.287",

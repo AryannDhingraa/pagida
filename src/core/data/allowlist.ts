@@ -1,5 +1,5 @@
 /**
- * Well-known domains, generated — do not edit by hand.
+ * Well-known domains, generated. Do not edit by hand.
  *
  * Source: Tranco list (tranco-list.eu), top 10000 entries, reduced to registrable domains.
  * v3 shipped a 2017-era Alexa top 2,000 that was missing figma.com, notion.so,

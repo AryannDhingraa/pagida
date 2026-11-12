@@ -49,6 +49,18 @@
       </label>
 
       <label class="row toggle">
+        <input type="checkbox" id="rememberSignIns">
+        <span class="txt"><b>Remember where I sign in</b>
+          <em>When you sign in on a site I already checked, I note its name and the look of its tab icon, here on this computer. If a different site later copies that icon and asks for your password, I can tell you which of your sites it is pretending to be. Never your username or password. <button type="button" class="link" id="forget-sign-ins">Forget them</button></em></span>
+      </label>
+
+      <label class="row toggle">
+        <input type="checkbox" id="rememberHistory">
+        <span class="txt"><b>Get to know the sites I use</b>
+          <em>I keep a private memory of the sites you visit and whether you came from an email, so a site you use every week stops being judged by guesswork, and a strange sign-in page you reach from an email stands out. It is stored scrambled, with a key your browser keeps locked, so the list cannot be read as site names. It never leaves this computer, and anything not visited for six months is forgotten. <button type="button" class="link" id="forget-history">Forget everything</button></em></span>
+      </label>
+
+      <label class="row toggle">
         <input type="checkbox" id="showBanner">
         <span class="txt"><b>Let me appear on the page</b>
           <em>When a page looks suspicious I will pop up in the corner with one sentence. Drag me anywhere; close me any time.</em></span>
@@ -63,6 +75,12 @@
         <input type="checkbox" id="useRdap">
         <span class="txt"><b>How old a website is</b>
           <em>Sends the domain name on its own, <code>example.com</code>, never the full address. Remembered for a week. This is the single strongest clue I have.</em></span>
+      </label>
+
+      <label class="row toggle">
+        <input type="checkbox" id="useDmarc">
+        <span class="txt"><b>Whether your work email address can be faked</b>
+          <em>When an email claims to come from your own organisation, I ask Cloudflare's public address book (DNS) whether your organisation's domain blocks forged mail. Sends that domain name only, <code>yourcompany.com</code>, about once a month. For well-known brands the answer is already built in, so nothing is sent.</em></span>
       </label>
 
       <label class="row toggle">

@@ -8,12 +8,12 @@
  *
  *  1. **URL tier only.** DOM rules need the page to be open, and opening a live
  *     phishing page to measure it is not something a defensive tool should do.
- *     Reputation rules are excluded too — scoring OpenPhish URLs against the
+ *     Reputation rules are excluded too: scoring OpenPhish URLs against the
  *     OpenPhish blocklist would be circular and would produce a meaningless 100%.
  *
  *  2. **Two negative sets.** Top-site home pages are an easy negative: short,
  *     clean, no path. So the harness also runs a hand-built set of *real brand
- *     login URLs* — long, path-heavy, full of words like "signin" and "verify" —
+ *     login URLs*: long, path-heavy, full of words like "signin" and "verify",
  *     which is where a naive URL heuristic falls over. The hard-negative number
  *     is the one worth quoting.
  *
@@ -151,7 +151,7 @@ function bar(label: string, samples: Sample[]): string {
 }
 
 async function main(): Promise<void> {
-  console.log('pagida evaluation — URL-tier rules only\n');
+  console.log('pagida evaluation: URL-tier rules only\n');
 
   const [phishRaw, topRaw] = await Promise.all([
     fetchLines(OPENPHISH),
@@ -212,9 +212,9 @@ async function main(): Promise<void> {
   console.log(`against hard negatives only (real login pages): ${hardOnly.fp} false positive(s) out of ${hardNegatives.length}\n`);
   console.log(`best F1 in the sweep: ${pct(best.f1)} at threshold ${best.threshold}\n`);
 
-  console.log(bar('score distribution — phishing', positives));
+  console.log(bar('score distribution: phishing', positives));
   console.log();
-  console.log(bar('score distribution — legitimate', allNegatives));
+  console.log(bar('score distribution: legitimate', allNegatives));
 
   const worstNegatives = [...allNegatives].sort((a, b) => b.score - a.score).slice(0, 8);
   console.log('\nhighest-scoring legitimate URLs (these are the false-positive risk):');

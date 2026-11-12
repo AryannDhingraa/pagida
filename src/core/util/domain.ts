@@ -8,7 +8,7 @@
  *
  * Pagida used to answer that with a hand-written list of ~100 common multi-part
  * suffixes and a "last two labels" fallback. That was a size trade-off, and it
- * was the wrong one — a mis-parsed suffix does not produce a slightly worse
+ * was the wrong one: a mis-parsed suffix does not produce a slightly worse
  * score, it produces a confident answer about the wrong domain. The full list
  * now ships, compiled at build time into `../data/psl.ts` (~35KB gzipped in the
  * package).
@@ -78,7 +78,7 @@ function suffixLabelCount(labels: string[]): number {
 
 export interface ParsedHost {
   hostname: string;
-  /** eTLD+1 — the thing a person actually buys. */
+  /** eTLD+1: the thing a person actually buys. */
   registrableDomain: string;
   /** The public suffix, e.g. `com` or `co.uk`. */
   suffix: string;

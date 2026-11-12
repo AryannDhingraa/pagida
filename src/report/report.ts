@@ -4,7 +4,7 @@
  * "What is this site?" is the question the popup could never answer, and it is
  * the one that actually lets a person decide for themselves. Four tabs, every
  * fact from a free public source, and every fact that could not be fetched
- * shown as "unknown" rather than quietly left out — a blank row is a lie by
+ * shown as "unknown" rather than quietly left out: a blank row is a lie by
  * omission when the whole point is helping someone judge a site.
  */
 
@@ -90,7 +90,7 @@ function plural(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`;
 }
 
-/** "3 days", "7 months", "12 years" — a person reads duration, not a day count. */
+/** "3 days", "7 months", "12 years": a person reads duration, not a day count. */
 function humanAge(days: number): string {
   if (days < 1) return 'today';
   if (days < 45) return plural(days, 'day', 'days');

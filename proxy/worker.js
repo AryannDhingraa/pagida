@@ -1,5 +1,5 @@
 /**
- * Pagida API proxy, v5 — a Cloudflare Worker.
+ * Pagida API proxy, v5: a Cloudflare Worker.
  *
  * WHY THIS EXISTS
  *
@@ -34,7 +34,9 @@
  * PRIVACY
  *
  * Only a bare domain name is accepted; anything with a path is refused.
- * Nothing is logged or stored except the day's request count.
+ * Nothing is logged. The only things stored are the day's request count and,
+ * per network, a count kept under a hash of the day and the IP address (never
+ * the address). Both are deleted two days later.
  *
  * DEPLOY (from this folder)
  *
@@ -50,6 +52,13 @@ const ALLOWED_ORIGIN_PREFIX = 'chrome-extension://';
 
 /** 3,000 a day x 31 days = 93,000: inside Web Risk's free 100,000 a month. */
 const DAILY_BUDGET = 3000;
+/**
+ * One network's share of a day. The per-minute limiters alone let a single IP
+ * spend 30 a minute, which empties the whole day in under two hours and turns
+ * the online check off for everyone. 150 covers an office or a family behind
+ * one address, and it would take 20 networks working together to drain a day.
+ */
+const DAILY_PER_IP = 150;
 const MEMO_TTL_MS = 60 * 60 * 1000;
 const MEMO_MAX = 2000;
 
@@ -100,12 +109,41 @@ export class Budget {
   }
 
   async fetch(request) {
-    const limit = Number(new URL(request.url).searchParams.get('limit') ?? DAILY_BUDGET);
+    const params = new URL(request.url).searchParams;
+    const limit = Number(params.get('limit') ?? DAILY_BUDGET);
+    const perIp = Number(params.get('perIp') ?? DAILY_PER_IP);
+    const who = params.get('who');
+    // Both counts live in this one object, so the check and the spend are one
+    // step and two requests can never both take the last lookup.
     const used = (await this.state.storage.get('used')) ?? 0;
     if (used >= limit) return new Response('spent', { status: 429 });
-    await this.state.storage.put('used', used + 1);
+    const whoKey = who ? `who:${who}` : null;
+    const usedByWho = whoKey ? (await this.state.storage.get(whoKey)) ?? 0 : 0;
+    if (whoKey && usedByWho >= perIp) return new Response('your share is spent', { status: 429 });
+    const writes = { used: used + 1 };
+    if (whoKey) writes[whoKey] = usedByWho + 1;
+    await this.state.storage.put(writes);
+    // Yesterday's object is no use to anyone: empty it two days on, so no
+    // network's count outlives the day it was for.
+    if (used === 0 && (await this.state.storage.getAlarm()) === null) {
+      await this.state.storage.setAlarm(Date.now() + 2 * 24 * 60 * 60 * 1000);
+    }
     return new Response(String(used + 1));
   }
+
+  async alarm() {
+    await this.state.storage.deleteAll();
+  }
+}
+
+/**
+ * A network's count is kept under a hash of the day and its address, never
+ * the address itself, and the day's object deletes itself after two days.
+ */
+async function networkKey(ip, day) {
+  const bytes = new TextEncoder().encode(`${day}|${ip}`);
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
+  return Array.from(digest.slice(0, 12), (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 /** True when this request may spend one upstream lookup. */
@@ -122,7 +160,8 @@ async function spend(env, request, installId) {
 
   const day = new Date().toISOString().slice(0, 10);
   const stub = env.BUDGET.get(env.BUDGET.idFromName(day));
-  const res = await stub.fetch(`https://budget/spend?limit=${DAILY_BUDGET}`);
+  const who = await networkKey(ip, day);
+  const res = await stub.fetch(`https://budget/spend?limit=${DAILY_BUDGET}&perIp=${DAILY_PER_IP}&who=${who}`);
   return res.ok;
 }
 

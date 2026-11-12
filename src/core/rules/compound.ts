@@ -1,5 +1,5 @@
 /**
- * Compound rules — combinations that mean much more together than apart.
+ * Compound rules: combinations that mean much more together than apart.
  *
  * A brand-new domain is mildly interesting. A password box is completely normal.
  * A password box on a domain registered last Tuesday is the phishing archetype,

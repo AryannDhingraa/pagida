@@ -197,7 +197,7 @@ async function loadQuickFacts(url: string): Promise<void> {
   }
   const r = res.report;
 
-  // How old — registration first, then the earliest certificate, then the archive.
+  // How old, registration first, then the earliest certificate, then the archive.
   const age = r.registration?.ageDays ?? r.certs?.ageDays ?? r.archive?.ageDays;
   if (age === undefined || age === null) setFact('f-age', 'Unknown', 'unknown');
   else setFact('f-age', describeAge(age), age < 30 ? 'bad' : age < 180 ? 'warn' : 'good');
@@ -224,7 +224,7 @@ const WEBMAIL = /^https:\/\/(?:mail\.google\.com|outlook\.(?:live|office|office3
 async function loadMailStatus(tabId: number): Promise<void> {
   const res = await chrome.runtime.sendMessage({ type: 'GET_MAIL_STATUS', tabId } satisfies Message).catch(() => null);
   if (!res?.ok || !res.mail) return;
-  const m = res.mail as { on: boolean; checked: number; warned: number; last?: { band: string; title: string; from: string } };
+  const m = res.mail as { on: boolean; checked: number; warned: number; reader?: string; last?: { band: string; title: string; from: string } };
   const box = $('mail');
   box.hidden = false;
   const line = $('mail-line');
@@ -234,6 +234,14 @@ async function loadMailStatus(tabId: number): Promise<void> {
     last.hidden = true;
     return;
   }
+  if (m.reader === 'blind') {
+    // Said plainly: silence here would look the same as "all clear".
+    line.textContent = 'I cannot read the email that is open. This mailbox may have changed its layout. Check that Pagida is up to date, and take extra care with links until I can read again.';
+    last.hidden = true;
+    box.dataset.state = 'blind';
+    return;
+  }
+  delete box.dataset.state;
   line.textContent = m.checked === 0
     ? 'Open an email and I will check it.'
     : `I checked ${m.checked} email${m.checked === 1 ? '' : 's'} in this tab. ${m.warned === 0 ? 'None needed a warning.' : `${m.warned} needed a warning.`}`;
@@ -301,7 +309,20 @@ $('options-link').addEventListener('click', () => void chrome.runtime.openOption
 
 // ---------------------------------------------------------------- startup
 
+/** The one-time note for people who updated from before 6.0. */
+async function showNews(): Promise<void> {
+  const { whatsNew } = await chrome.storage.local.get('whatsNew');
+  if (whatsNew !== '6.0') return;
+  const box = $('news');
+  box.hidden = false;
+  $('news-ok').addEventListener('click', () => {
+    box.hidden = true;
+    void chrome.storage.local.remove('whatsNew');
+  });
+}
+
 async function init(): Promise<void> {
+  void showNews();
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab || tab.id === undefined) {
     iris.setExpression('sleepy');
@@ -311,7 +332,7 @@ async function init(): Promise<void> {
   }
 
   // `tab.url` is only readable with host permission for that page. The popup
-  // has activeTab, which grants it — but a worker restart or a race can still
+  // has activeTab, which grants it, but a worker restart or a race can still
   // leave it empty, so the service worker (which learned the URL from the
   // content script) is the fallback. Getting this wrong is what made the popup
   // claim there was nothing to check on a perfectly ordinary website.

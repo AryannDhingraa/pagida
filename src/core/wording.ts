@@ -75,7 +75,7 @@ export function adviceFor(verdict: Verdict): string {
  *
  * The criticism this answers: a weighted sum presented beside "do not type your
  * password here" reads as a probability, and it is not one. 55 does not mean
- * "55% likely" — it means some rules fired and their weights added up. These
+ * "55% likely". It means some rules fired and their weights added up. These
  * lines say where the answer came from, so the user can tell the difference
  * between six cosmetic observations and one positive identification.
  */

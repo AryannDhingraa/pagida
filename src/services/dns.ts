@@ -2,7 +2,7 @@
  * DNS lookups over HTTPS, via Cloudflare's public resolver.
  *
  * Free, no key, no account, CORS-enabled. What leaves the machine is a domain
- * name — the same thing already sent to RDAP — and never a path or a page.
+ * name, the same thing already sent to RDAP, and never a path or a page.
  *
  * Everything here returns `undefined` rather than throwing. A site report with
  * one row missing is useful; a site report that failed is not.
@@ -40,9 +40,9 @@ export interface DnsFacts {
   hasMx?: boolean;
   mxHosts?: string[];
   nameservers?: string[];
-  /** The host is an alias for something else — often a CDN or a site builder. */
+  /** The host is an alias for something else: often a CDN or a site builder. */
   cname?: string[];
-  /** Published sender policy — absent is a mild negative for a real business. */
+  /** Published sender policy: absent is a mild negative for a real business. */
   hasSpf?: boolean;
   spf?: string;
   /** Published anti-spoofing policy, and how strict it is. */
@@ -60,14 +60,14 @@ function unquote(s: string): string {
  * @param domain   the registrable domain, e.g. `example.com`
  *
  * Addresses are looked up on the hostname, because plenty of sites publish an A
- * record only on `www` — an earlier version queried the registrable domain and
+ * record only on `www`: an earlier version queried the registrable domain and
  * came back with nothing for all of them. Mail and policy records are looked up
  * on the registrable domain, which is where they are published.
  */
 export async function lookupDns(hostname: string, domain: string): Promise<DnsFacts> {
   const facts: DnsFacts = {};
 
-  // Fired together — the report is already the slowest thing Pagida does.
+  // Fired together: the report is already the slowest thing Pagida does.
   const [a, aaaa, mx, ns, txt, dmarcTxt, cname] = await Promise.all([
     query(hostname, 'A'),
     query(hostname, 'AAAA'),

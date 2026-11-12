@@ -9,13 +9,13 @@ import type { DomEvidence } from '../../core/types.js';
 import { BITB_HOSTS, BRAND_ASSET_HOSTS, LOGIN_FINGERPRINTS } from '../../core/data/fingerprints.js';
 import {
   exfilTarget, hasRunInstructions, isBotExfil, isClickFix, isCryptoClaimLure, isDocumentLure,
-  isTechSupportScam, mentionsSeedPhrase,
+  isTechSupportScam, looksHostile, looksLikeCommand, mentionsSeedPhrase,
 } from '../../core/lures.js';
 import { score as modelScore } from '../../learned/textModel.js';
 import { PAGE_MODEL } from '../../learned/data/pageModel.js';
 
 type Offline = Pick<DomEvidence,
-  'loginFingerprints' | 'brandAssets' | 'faviconUrl' | 'asksCard' | 'asksOneTimeCode' | 'asksSeedPhrase'
+  'loginFingerprints' | 'brandAssets' | 'faviconUrl' | 'asksCard' | 'asksOneTimeCode' | 'asksSeedPhrase' | 'formAsksPassword' | 'formAsksEmail'
   | 'exfilTarget' | 'botExfil' | 'clipboardCommand' | 'clickFix' | 'runInstructions' | 'techSupportScam'
   | 'documentLure' | 'cryptoLure' | 'fakeAddressBar' | 'textModelScore'>;
 
@@ -54,7 +54,7 @@ function brandAssets(): string[] {
   return [...out];
 }
 
-function faviconUrl(): string | undefined {
+export function faviconUrl(): string | undefined {
   const link = document.querySelector<HTMLLinkElement>('link[rel~="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]');
   const href = link?.getAttribute('href') || '/favicon.ico';
   try {
@@ -63,15 +63,29 @@ function faviconUrl(): string | undefined {
   } catch { return undefined; }
 }
 
-const LABEL = (i: HTMLInputElement) =>
-  `${i.name} ${i.id} ${i.getAttribute('autocomplete') ?? ''} ${i.getAttribute('aria-label') ?? ''} ${i.placeholder} ${i.labels?.[0]?.textContent ?? ''}`.toLowerCase();
+/** The text that names a field: its own attributes, its <label>, and what aria-labelledby points to (how Google Forms labels questions). */
+const LABEL = (i: HTMLInputElement) => {
+  const by = (i.getAttribute('aria-labelledby') ?? '').split(/\s+/).filter(Boolean).slice(0, 4)
+    .map((id) => document.getElementById(id)?.textContent ?? '').join(' ');
+  return `${i.name} ${i.id} ${i.getAttribute('autocomplete') ?? ''} ${i.getAttribute('aria-label') ?? ''} ${i.placeholder} ${i.labels?.[0]?.textContent ?? ''} ${by.slice(0, 200)}`.toLowerCase();
+};
 
-function asks(text: string): Pick<Offline, 'asksCard' | 'asksOneTimeCode' | 'asksSeedPhrase'> {
+/** "Password", in the languages phishing forms use most. Not "password manager" or "forgot your password". */
+const PASSWORD_WORD = /\b(?:password|passcode|passwort|kennwort|contrase[ñn]a|mot de passe|senha|wachtwoord|parola|has[łl]o|pass ?word)\b(?!\s*(?:manager|hint|reset|policy))/;
+const NOT_A_PASSWORD_ASK = /forgot|reset|manager|change your|new password/;
+const EMAIL_WORD = /\b(?:e-?mail|username|user ?name|user id|login|correo|adresse|benutzername)\b/;
+
+function asks(text: string): Pick<Offline, 'asksCard' | 'asksOneTimeCode' | 'asksSeedPhrase' | 'formAsksPassword' | 'formAsksEmail'> {
   const inputs = Array.from(document.querySelectorAll<HTMLInputElement>('input:not([type="hidden"]), textarea'))
     .filter(visible).slice(0, 80);
   let card = false; let otp = false; let wordBoxes = 0; let bigTextarea = false;
+  let pwText = false; let emailField = false;
   for (const i of inputs) {
     const l = LABEL(i);
+    const kind = (i.getAttribute('type') ?? 'text').toLowerCase();
+    if (kind === 'email' || EMAIL_WORD.test(l)) emailField = true;
+    // A password asked for in an ordinary text field: real sign-in pages use a password box.
+    if (kind !== 'password' && PASSWORD_WORD.test(l) && !NOT_A_PASSWORD_ASK.test(l)) pwText = true;
     if (/cc-number|card.?num|cardnumber|ccnum|credit.?card|debit.?card|card no/.test(l)) card = true;
     if (/one-time-code|\botp\b|one.?time|verification.?code|sms.?code|security.?code|2fa|mfa|auth.?code|passcode/.test(l)
       && !/cvv|cvc|csc/.test(l)) otp = true;
@@ -80,7 +94,7 @@ function asks(text: string): Pick<Offline, 'asksCard' | 'asksOneTimeCode' | 'ask
   }
   const seed = mentionsSeedPhrase(text) && (wordBoxes >= 12 || bigTextarea
     || (inputs.some((i) => i instanceof HTMLTextAreaElement) && /enter|type|paste|import|restore|validate|sync/i.test(text)));
-  return { asksCard: card, asksOneTimeCode: otp, asksSeedPhrase: seed };
+  return { asksCard: card, asksOneTimeCode: otp, asksSeedPhrase: seed, formAsksPassword: pwText, formAsksEmail: emailField };
 }
 
 function exfil(): Pick<Offline, 'exfilTarget' | 'botExfil'> {
@@ -120,7 +134,15 @@ function fakeAddressBar(): string | undefined {
 /** Set by the clipboard watcher (main world) when the page copies a command. */
 let lastClipboard: string | undefined;
 export function noteClipboard(text: string): void {
-  lastClipboard = text.slice(0, 300);
+  const next = text.slice(0, 300);
+  // The message this arrives in can be forged by the page, so a later one may
+  // add to what was seen but never clear it: a command is not replaced by
+  // plain text, and a hostile command is not replaced by a tamer one.
+  if (lastClipboard !== undefined) {
+    if (looksLikeCommand(lastClipboard) && !looksLikeCommand(next)) return;
+    if (looksHostile(lastClipboard) && !looksHostile(next)) return;
+  }
+  lastClipboard = next;
 }
 
 export function extractOffline(): Offline {

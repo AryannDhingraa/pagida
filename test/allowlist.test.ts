@@ -19,7 +19,7 @@ describe('well-known domain allowlist', () => {
   });
 
   it('suppresses lookalike rules for well-known sites', () => {
-    // telegraph.co.uk sits two edits from "telegram" — the exact false positive
+    // telegraph.co.uk sits two edits from "telegram", the exact false positive
     // the allowlist exists to remove.
     expect(ids('https://telegraph.co.uk/')).not.toContain('brand_typosquat');
     expect(ids('https://mail.ru/')).not.toContain('brand_typosquat');

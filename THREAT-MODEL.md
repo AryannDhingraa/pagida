@@ -38,7 +38,7 @@ Everything else is secondary.
   attacker uses the site's own domain, path structure and appearance. If the URL
   is ordinary and the page does not post credentials off-site, Pagida has
   nothing to work with.
-- **Phishing that does not involve a web page** — SMS, voice, QR codes,
+- **Phishing that does not involve a web page**: SMS, voice, QR codes,
   malicious attachments, OAuth consent phishing.
 - **Attacker-in-the-middle proxy kits** (Evilginx and similar) served from a
   domain that has aged past the heuristics and is not yet blocklisted. The page
@@ -47,9 +47,10 @@ Everything else is secondary.
   defences here, and neither is guaranteed.
 - **Malware, drive-by downloads, or exploits.** Pagida flags a `.exe` in a path;
   it does not analyse files.
-- **Anything inside an iframe.** The content script runs in the top frame only,
-  by design — running in every frame multiplies the attack surface for a
-  marginal gain.
+- **Most things inside an iframe.** The page reader runs in the top frame only,
+  by design: running all of it in every frame multiplies the attack surface for
+  a marginal gain. The one exception is the ClickFix guard, which since v6 runs
+  in every frame, because a hidden frame was a way to slip a command past it.
 - **Pages loaded before the extension is ready.** On browser startup the service
   worker may take a moment; the first page of a session can be scored late.
 
@@ -59,7 +60,7 @@ Everything else is secondary.
 
 A page can detect that a content script is present and change its behaviour.
 Pagida takes the reading once at `document_idle` and again on DOM mutation, so a
-kit that swaps in the credential form after a delay is still seen — but a kit
+kit that swaps in the credential form after a delay is still seen. But a kit
 that renders the form only after user interaction may be scored on the wrong
 content. **This is a real, unresolved gap.**
 
@@ -73,8 +74,8 @@ which the page cannot touch at all, is the authoritative indicator.
 
 ### A hostile page trying to poison the score
 
-The content script sends a fixed-shape, strongly-typed summary — booleans,
-counts and a small set of strings — never arbitrary page content. A page can lie
+The content script sends a fixed-shape, strongly-typed summary (booleans,
+counts and a small set of strings), never arbitrary page content. A page can lie
 about its own structure (hide its password field until later), which reduces the
 score; it cannot inject new signals or push the score down below what the
 address tier already found.
@@ -90,7 +91,7 @@ code execution. The content security policy forbids remote scripts entirely.
 
 Stored in `chrome.storage.local`, never synced, never logged, and sent only to
 `safebrowsing.googleapis.com`. Anyone with access to the browser profile can
-read it — the same as any credential stored in a browser. Use a key scoped to
+read it, the same as any credential stored in a browser. Use a key scoped to
 the Safe Browsing API only.
 
 ### Supply chain

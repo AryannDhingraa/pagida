@@ -32,7 +32,7 @@ export const AMBIGUOUS_TOKENS: ReadonlySet<string> = new Set([
   'apple', 'booking', 'canvas', 'chase', 'coles', 'discord', 'kraken', 'ledger',
   'linkt', 'optus', 'slack', 'steam', 'stripe', 'uber', 'visa', 'wise', 'zoom',
   'amazon', 'outlook', 'telegram', 'twitter', 'myki', 'medicare', 'blackboard',
-  'notion', 'proton', 'agl', 'evri', 'dpd', 'kayo', 'humm', 'osko', 'okta', 'temu', 'etsy', 'twitch', 'xero',
+  'notion', 'proton', 'agl', 'interbank', 'dkb', 'evri', 'dpd', 'kayo', 'humm', 'osko', 'okta', 'temu', 'etsy', 'twitch', 'xero',
 ]);
 
 /**

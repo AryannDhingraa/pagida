@@ -2,7 +2,7 @@
  * The toolbar icon, drawn at runtime so it can move.
  *
  * A static PNG cannot react, and the toolbar is the one part of the interface a
- * hostile page can never touch — so it is worth spending a little effort on. The
+ * hostile page can never touch, so it is worth spending a little effort on. The
  * icon is Iris's head rendered into an OffscreenCanvas in the service worker and
  * handed to `chrome.action.setIcon` frame by frame.
  *
@@ -88,7 +88,7 @@ function drawFrame(state: FrameState): ImageData | null {
   }
   c.restore();
 
-  // The face. Kept to brows, eyes and the L nose — a mouth at this size is mud.
+  // The face. Kept to brows, eyes and the L nose. A mouth at this size is mud.
   c.strokeStyle = '#FFFFFF';
   c.fillStyle = '#FFFFFF';
   c.lineWidth = SIZE * 0.075;
@@ -146,8 +146,8 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const running = new Map<number, symbol>();
 
 /**
- * A short reaction when a page finishes being scored: a bounce, a blink, and —
- * for the top two bands — a couple of pulses so it catches the eye without
+ * A short reaction when a page finishes being scored: a bounce, a blink, and,
+ * for the top two bands, a couple of pulses so it catches the eye without
  * becoming a strobe.
  */
 export async function animateIcon(tabId: number, band: Band): Promise<void> {

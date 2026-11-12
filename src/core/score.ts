@@ -23,6 +23,8 @@ import type { Band, Confidence, Conclusion, PageEvidence, Rule, Signal, Verdict 
 import { ALL_RULES } from './rules/index.js';
 import { concludeFrom, floorFrom, higherBand, bandRank } from './conclusions.js';
 import { isPrivateHost } from './util/network.js';
+import { parseHost } from './util/domain.js';
+import { BRAND_DOMAINS, isOfficialDomain, isWellKnown } from './data/index.js';
 
 export { BAND_ADVICE, BAND_HEADLINE, BAND_NAME, CONFIDENCE_NOTE, adviceFor, headlineFor } from './wording.js';
 
@@ -31,7 +33,7 @@ export { BAND_ADVICE, BAND_HEADLINE, BAND_NAME, CONFIDENCE_NOTE, adviceFor, head
  * numbers. See EVALUATION.md: on address evidence alone the engine separates
  * confirmed phishing from legitimate sites cleanly around 15-35, and the top
  * band is set high enough that it is effectively unreachable without either
- * page-content evidence or a blocklist match — which is deliberate, because the
+ * page-content evidence or a blocklist match, which is deliberate, because the
  * top band is the only one that interrupts the user.
  */
 export const BAND_THRESHOLDS = {
@@ -214,7 +216,12 @@ export function capHeuristics(band: Band, e: PageEvidence, signals: Signal[], co
   // Old domains are softened, except where the address shows the site has
   // been broken into: phishing kits live on old, hacked WordPress sites.
   const compromised = signals.some((s) => s.id === 'wordpress_internal_path' || s.id === 'wordpress_upload_path');
-  const ceiling: Band = (e.domainAgeDays ?? 0) >= 730 && !compromised ? 'caution' : 'suspicious';
+  // Top sites, brands' own domains and official domains (gov.in, gov.au) are
+  // never judged by guesswork alone, however new the page or the domain.
+  const here = parseHost(e.hostname).registrableDomain;
+  // A site this person has used on many days, with no warning ever, counts as known to them.
+  const known = isWellKnown(here) || BRAND_DOMAINS.has(here) || isOfficialDomain(here) || !!e.history?.trusted;
+  const ceiling: Band = ((e.domainAgeDays ?? 0) >= 730 || known) && !compromised ? 'caution' : 'suspicious';
   return bandRank(band) > bandRank(ceiling) ? ceiling : band;
 }
 

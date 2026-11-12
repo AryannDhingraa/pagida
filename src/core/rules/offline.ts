@@ -1,5 +1,5 @@
 /**
- * Tier 2b — v5 offline rules.
+ * Tier 2b: v5 offline rules.
  *
  * These read what the page is built from and what it does, using evidence the
  * content script gathered on the machine. None of them needs a network call,

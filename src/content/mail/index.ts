@@ -7,7 +7,8 @@
  * links, attachment names, image addresses for QR decoding) plus one number
  * from the model. Nothing is stored, and nothing leaves the computer.
  */
-import { readOpenMessages, type OpenMessage } from './adapters.js';
+import { readOpenMessages, readerFacts, type OpenMessage } from './adapters.js';
+import { readerState, SETTLE_MS, type ReaderState } from '../../email/health.js';
 import { guardLinks, showBanner, showChecked } from './banner.js';
 import { score } from '../../learned/textModel.js';
 import { EMAIL_MODEL } from '../../learned/data/emailModel.js';
@@ -46,6 +47,7 @@ async function check(m: OpenMessage): Promise<void> {
     console.info(`[Pagida] email checked: ${v.band}${v.conclusions.length ? ` (${v.conclusions.map((c) => c.id).join(', ')})` : ''}`);
     if (v.conclusions.length > 0) showBanner(m.anchor, v);
     else showChecked(m.anchor, v);
+    noteClicks(m.body, v);
     guardLinks(m.body, res.verdict.riskyLinks, unwrapLink);
   } catch {
     // Extension reloading, or the worker asleep: the next mutation retries.
@@ -53,10 +55,58 @@ async function check(m: OpenMessage): Promise<void> {
   }
 }
 
+/**
+ * When a link in a checked email is opened, the page it leads to is checked
+ * knowing it came from this email (and whether the email was a warning).
+ * Only the link and the verdict go to the worker, never the email.
+ */
+const watched = new WeakMap<HTMLElement, EmailVerdict>();
+function noteClicks(body: HTMLElement, v: EmailVerdict): void {
+  const fresh = !watched.has(body);
+  watched.set(body, v);
+  if (!fresh) return;
+  const opened = (e: MouseEvent): void => {
+    const a = (e.target as HTMLElement | null)?.closest?.('a[href]') as HTMLAnchorElement | null;
+    const verdict = watched.get(body);
+    if (!a || !verdict) return;
+    void chrome.runtime.sendMessage({ type: 'EMAIL_LINK_OPENED', href: unwrapLink(a.href), band: verdict.band, warned: verdict.conclusions.length > 0 } satisfies Message).catch(() => undefined);
+  };
+  // Capture, so this runs before the link guard's confirm and before Gmail opens the tab.
+  body.addEventListener('click', opened, true);
+  body.addEventListener('auxclick', opened, true);
+}
+
 let timer: ReturnType<typeof setTimeout> | undefined;
 function scan(): void {
   timer = undefined;
-  for (const m of readOpenMessages()) void check(m);
+  const messages = readOpenMessages();
+  for (const m of messages) void check(m);
+  judge(messages.length);
+}
+
+// ---------------------------------------------------------------- health
+
+let lastAddress = location.href;
+let addressChangedAt = Date.now();
+let reported: ReaderState | undefined;
+let recheck: ReturnType<typeof setTimeout> | undefined;
+
+/** Tell the worker when Pagida can, or cannot, read what is open. */
+function judge(messagesRead: number): void {
+  if (location.href !== lastAddress) { lastAddress = location.href; addressChangedAt = Date.now(); }
+  const facts = readerFacts(messagesRead, Date.now() - addressChangedAt);
+  if (!facts) return;
+  const state = readerState(facts);
+  // A page that has stopped changing sends no more mutations, so come back
+  // once the email has had its time to load.
+  if (state === 'loading' && recheck === undefined) {
+    recheck = setTimeout(() => { recheck = undefined; schedule(); }, SETTLE_MS);
+  }
+  if (state === 'loading' || state === reported) return;
+  reported = state;
+  // eslint-disable-next-line no-console -- the state only, never content
+  if (state === 'blind') console.warn('[Pagida] an email is open but could not be read. The mailbox layout may have changed.');
+  void chrome.runtime.sendMessage({ type: 'MAIL_HEALTH', state, client: facts.client } satisfies Message).catch(() => { reported = undefined; });
 }
 function schedule(): void {
   if (timer === undefined) timer = setTimeout(scan, 700);

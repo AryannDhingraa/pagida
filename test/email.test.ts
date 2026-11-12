@@ -184,6 +184,21 @@ describe('callback scams', () => {
   it('a fake renewal with a phone number is called out', () => {
     expect(ids(mail({ fromName: 'Billing Dept', fromAddress: 'david@agratandooricuisine.com', subject: 'Order Number: WMT-982374', bodyText: body }))).toContain('callback_scam');
   });
+  // Callback scams sent through a real service: the sender checks all pass.
+  const note = 'Invoice INV-2291. Amount due: $649.99 for McAfee Total Protection. If you did not authorize this payment, call our billing desk at +1 (808) 555-0142 to cancel and get a refund.';
+  it('a scam note inside a real PayPal invoice is called out, naming PayPal', () => {
+    const v = run(mail({ fromName: 'service@paypal.com', fromAddress: 'service@paypal.com', subject: 'You have a new invoice', bodyText: note }));
+    expect(v.conclusions.map((c) => c.id)).toContain('callback_through_service');
+    expect(v.conclusions.find((c) => c.id === 'callback_through_service')?.title).toContain('PayPal');
+  });
+  it('an ordinary PayPal receipt stays quiet', () => {
+    const t = 'You sent a payment of $24.00 AUD to Bunnings. It may take a few moments for this transaction to appear in your account. Questions? Visit the Help Centre.';
+    expect(ids(mail({ fromName: 'PayPal', fromAddress: 'service@paypal.com.au', subject: 'Receipt for your payment', bodyText: t }))).toEqual([]);
+  });
+  it('a real business invoice through QuickBooks with a phone number but no "not you" hook stays quiet', () => {
+    const t = 'Invoice 1042 from Smith Plumbing. Amount due: $380.00. Questions about this invoice? Call us on 03 9555 0100.';
+    expect(ids(mail({ fromName: 'Smith Plumbing', fromAddress: 'quickbooks@notification.intuit.com', subject: 'Invoice 1042', bodyText: t }))).not.toContain('callback_through_service');
+  });
   it('a newsletter footer with a sales number and a price is not', () => {
     const t = 'New edition, $44.95. Order online or call 1-800-998-9938. To unsubscribe from this newsletter, visit our site.';
     expect(ids(mail({ fromName: "O'Reilly", fromAddress: 'news@oreillynet.com', subject: 'New book', bodyText: t }))).not.toContain('callback_scam');
@@ -223,5 +238,55 @@ describe('brand-new domains (online)', () => {
     const v = run(mail({ fromName: 'Mia', fromAddress: 'mia@miasbakery.com.au', subject: 'We are open!', domainAges: { 'miasbakery.com.au': 12 },
       bodyText: 'Come by for a free coffee this week.' }));
     expect(v.conclusions).toEqual([]);
+  });
+});
+
+describe('company policy: the organisation\'s own domains', () => {
+  const notice = {
+    fromName: 'Acme IT Helpdesk', toAddress: 'pat@acme.com.au', subject: 'Acme mailbox quota',
+    bodyText: 'Your mailbox is almost full and will stop receiving email. Sign in to keep receiving email.',
+  };
+  const org = ['acme.com.au', 'acme-group.net'];
+  it('a notice from the company\'s own second domain is not called a fake, once policy names it', () => {
+    const e = mail({ ...notice, fromAddress: 'it@acme-group.net', links: [{ text: 'Sign in', href: 'https://portal.acme-group.net/quota' }], orgDomains: org });
+    expect(ids(e)).toEqual([]);
+  });
+  it('without the policy that same notice looks like an outsider using the company name', () => {
+    const e = mail({ ...notice, fromAddress: 'it@acme-group.net', links: [{ text: 'Sign in', href: 'https://portal.acme-group.net/quota' }] });
+    expect(ids(e)).toContain('fake_internal_sender');
+  });
+  it('a stranger sending the same notice is still a full warning under the policy', () => {
+    const e = mail({ ...notice, fromAddress: 'it@acme-mailsupport.top', links: [{ text: 'Sign in', href: 'https://acme-mailsupport.top/quota' }], orgDomains: org });
+    expect(run(e).band).toBe('danger');
+  });
+});
+
+describe('addresses that can be forged (DMARC)', () => {
+  const ask = { fromName: 'Pat (Finance)', toAddress: 'sam@acme.com.au', subject: 'Updated invoice, please review today',
+    bodyText: 'Hi Sam, please review and sign the updated invoice before 3pm today.' };
+  const away = [{ text: 'Review invoice', href: 'https://acme-invoices.top/review' }];
+  it('"from your own company" with a link elsewhere, on a domain with no DMARC, is suspicious', () => {
+    const v = run(mail({ ...ask, fromAddress: 'pat@acme.com.au', links: away, senderDmarc: 'missing' }));
+    expect(v.conclusions.map((c) => c.id)).toContain('forgeable_sender');
+  });
+  it('the same email on a domain that rejects forgeries stays quiet on this point', () => {
+    const v = run(mail({ ...ask, fromAddress: 'pat@acme.com.au', links: away, senderDmarc: 'reject' }));
+    expect(v.conclusions.map((c) => c.id)).not.toContain('forgeable_sender');
+  });
+  it('a colleague linking to the company\'s own site is not flagged, even without DMARC', () => {
+    const v = run(mail({ ...ask, fromAddress: 'pat@acme.com.au', links: [{ text: 'Review', href: 'https://intranet.acme.com.au/invoices/22' }], senderDmarc: 'none' }));
+    expect(v.conclusions.map((c) => c.id)).not.toContain('forgeable_sender');
+  });
+  it('a chatty colleague who wants nothing done is not flagged', () => {
+    const v = run(mail({ fromName: 'Pat', fromAddress: 'pat@acme.com.au', toAddress: 'sam@acme.com.au', subject: 'Lunch?', bodyText: 'Pho at 12?', links: [{ text: 'menu', href: 'https://phohouse.com.au/menu' }], senderDmarc: 'missing' }));
+    expect(v.conclusions.map((c) => c.id)).not.toContain('forgeable_sender');
+  });
+});
+
+describe('mail from real government and university accounts', () => {
+  it('a mailbox scam sent from a hacked gov.tr account is still called out', () => {
+    const e = mail({ fromName: 'Mail Administrator', fromAddress: 'aksehir.ym@gsb.gov.tr', toAddress: 'jose@monkey.org', subject: 'monkey.org mailbox quota exceeded',
+      bodyText: 'Your mailbox is full and you will stop receiving messages. Sign in to increase your quota now.', links: [{ text: 'Upgrade now', href: 'https://quota-upgrade.top/monkey' }] });
+    expect(ids(e).length).toBeGreaterThan(0);
   });
 });

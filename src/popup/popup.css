@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
    Popup.
-   One continuous surface, no hard section rules — the aurora wash behind the
+   One continuous surface, no hard section rules: the aurora wash behind the
    verdict fades into the list, so the whole thing reads as one card rather than
    four stacked panels.
    -------------------------------------------------------------------------- */
@@ -153,3 +153,7 @@ footer {
 .mail p { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--ink-2); }
 .mail p.last { margin-top: 5px; font-weight: 600; color: var(--danger); }
 .mail p.last[data-band="suspicious"] { color: var(--caution); }
+
+/* One-time "what's new" note after an update. */
+.news { margin: 0 18px 12px; padding: 10px 12px; border-radius: 12px; background: var(--brand-wash); font-size: 13px; line-height: 1.5; }
+.news p { margin: 0 0 6px; }

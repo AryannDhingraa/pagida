@@ -29,7 +29,7 @@ const domains = [...new Set(rows
   .filter((d) => d.includes('.')))].sort();
 
 writeFileSync('src/core/data/allowlist.ts', `/**
- * Well-known domains, generated — do not edit by hand.
+ * Well-known domains, generated. Do not edit by hand.
  *
  * Source: Tranco list (tranco-list.eu), top ${SIZE} entries, reduced to registrable domains.
  * Regenerate with \`npm run build:allowlist -- top-1m.csv\`.

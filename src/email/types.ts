@@ -6,6 +6,7 @@
  * engine (src/email/evaluate.ts) is pure, so the same code runs in the
  * extension, in the tests and in the evaluation scripts.
  */
+import type { DmarcPolicy } from '../core/dmarc.js';
 import type { Band, Conclusion, Signal } from '../core/types.js';
 
 export interface EmailLink {
@@ -40,6 +41,10 @@ export interface EmailEvidence {
   domainAges?: Record<string, number | null>;
   /** Trained text model's probability of phishing, from the content script. */
   textModelScore?: number | null;
+  /** The reader's organisation's own domains, when set by company policy. */
+  orgDomains?: string[];
+  /** The sender domain's DMARC policy, when Pagida knows it (bundled for brands, looked up for your own organisation). */
+  senderDmarc?: DmarcPolicy;
 }
 
 /** One link's local verdict, filled in by the worker before evaluation. */

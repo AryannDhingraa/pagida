@@ -3,7 +3,7 @@
  *
  * She lives in a closed shadow root attached to the document element, so the
  * page cannot restyle her, cannot read her, and cannot reach into her with a
- * querySelector. A determined page can still remove the host node — which is
+ * querySelector. A determined page can still remove the host node, which is
  * why the toolbar badge, not this, is the authoritative indicator.
  *
  * She is draggable and remembers where she was put, because a fixed bubble in

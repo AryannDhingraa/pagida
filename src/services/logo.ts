@@ -15,7 +15,7 @@ import { BRAND_ICON_HASHES } from '../core/data/icons.js';
 // Tuned on 356 favicons from 260 random top-20,000 sites: no false match at 5
 // bits, two at 6. Four leaves a margin.
 const MAX_DISTANCE = 4;
-const cache = new Map<string, string[]>();
+const cache = new Map<string, string | null>();
 
 export function brandsForHash(hash: string): string[] {
   if (!informative(hash)) return [];
@@ -28,10 +28,16 @@ export function brandsForHash(hash: string): string[] {
 }
 
 export async function logoBrands(faviconUrl: string | undefined): Promise<string[]> {
-  if (!faviconUrl) return [];
+  const hash = await faviconHash(faviconUrl);
+  return hash ? brandsForHash(hash) : [];
+}
+
+/** The favicon's fingerprint, or null when it cannot be read. */
+export async function faviconHash(faviconUrl: string | undefined): Promise<string | null> {
+  if (!faviconUrl) return null;
   const hit = cache.get(faviconUrl);
-  if (hit) return hit;
-  let result: string[] = [];
+  if (hit !== undefined) return hit;
+  let result: string | null = null;
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 2500);
@@ -45,7 +51,7 @@ export async function logoBrands(faviconUrl: string | undefined): Promise<string
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(bmp, 0, 0, 9, 8);
-          result = brandsForHash(dhashFromRgba(ctx.getImageData(0, 0, 9, 8).data));
+          result = dhashFromRgba(ctx.getImageData(0, 0, 9, 8).data);
         }
       }
     }

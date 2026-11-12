@@ -4,7 +4,7 @@
  * Modern phishing leans on free hosting and disposable domains, where the label
  * is generated rather than named: `e5o6x7os.pages.dev`, `8acd0e.example.cl`,
  * `dohtshi6.pages.dev`. None of those trip a brand-similarity check, because
- * they are not pretending to be a brand at all — the deception happens on the
+ * they are not pretending to be a brand at all: the deception happens on the
  * page, and the address is just throwaway infrastructure.
  *
  * This is heuristic and it is meant to be. It carries a low weight and exists to
@@ -59,7 +59,7 @@ export function looksGenerated(rawLabel: string): RandomnessVerdict {
 
 /**
  * Hosts where every subdomain belongs to a different, usually anonymous, person.
- * Free, instant, and disposable — which is why phishing kits live on them.
+ * Free, instant, and disposable, which is why phishing kits live on them.
  */
 export const FREE_HOSTING_SUFFIXES: ReadonlySet<string> = new Set([
   'pages.dev', 'workers.dev', 'r2.dev', 'trycloudflare.com',
@@ -75,4 +75,19 @@ export const FREE_HOSTING_SUFFIXES: ReadonlySet<string> = new Set([
   'my.id', 'ivv.my.id', 'wuaze.com', 'wordpress.com', 'blogspot.com.au',
   'framer.website', 'webflow.io', 'notion.site', 'super.site', 'carrd.co',
   'bubbleapps.io', 'softr.app', 'durable.co', 'godaddysites.com',
+  // Seen carrying sign-in pages in the November 2026 benchmark, and their kin.
+  'zapier.app', 'gitbook.io', 'cleverapps.io', 'lovable.app', 'replit.app',
+  'jimdosite.com', 'webnode.page', 'mystrikingly.com', 'tilda.ws', 'yolasite.com', 'site123.me',
 ]);
+
+/**
+ * The free host this hostname sits on, or null. Checks the public suffix
+ * first, then the registrable domain, because some hosts (zapier.app,
+ * gitbook.io) are not on the public suffix list, so their users' pages look
+ * like subdomains of one old, respectable domain.
+ */
+export function freeHostOf(hostname: string, suffix: string, registrableDomain: string): string | null {
+  if (FREE_HOSTING_SUFFIXES.has(suffix)) return suffix;
+  if (hostname !== registrableDomain && hostname !== `www.${registrableDomain}` && FREE_HOSTING_SUFFIXES.has(registrableDomain)) return registrableDomain;
+  return null;
+}

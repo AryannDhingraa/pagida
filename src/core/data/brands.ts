@@ -3,8 +3,8 @@
  * serve them.
  *
  * Two rules use this list:
- *  1. Typosquat detection — is the domain one or two edits away from a brand?
- *  2. Brand-mismatch detection — does the page say "PayPal" while being served
+ *  1. Typosquat detection: is the domain one or two edits away from a brand?
+ *  2. Brand-mismatch detection: does the page say "PayPal" while being served
  *     from somewhere that isn't PayPal?
  *
  * Australian brands are included deliberately: locally targeted phishing
@@ -264,6 +264,16 @@ export const BRANDS: Brand[] = [
   { token: 'twitch', domains: ['twitch.tv'] },
   { token: 'eaplay', domains: ['ea.com'] },
   { token: 'ubisoft', domains: ['ubisoft.com', 'ubi.com'] },
+
+  // --- Regional banks and services seen in the November 2026 benchmark misses ---
+  { token: 'ameli', domains: ['ameli.fr'] },
+  { token: 'dkb', domains: ['dkb.de'] },
+  { token: 'swisspass', domains: ['swisspass.ch', 'sbb.ch'] },
+  { token: 'postfinance', domains: ['postfinance.ch'] },
+  { token: 'labanquepostale', domains: ['labanquepostale.fr'] },
+  { token: 'multired', domains: ['bn.com.pe'] },
+  { token: 'bancolombia', domains: ['bancolombia.com'] },
+  { token: 'interbank', domains: ['interbank.pe'] },
 ];
 
 /** Every legitimate registrable domain across all brands, for fast lookup. */

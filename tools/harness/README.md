@@ -9,6 +9,7 @@ visit and aborts if it cannot, so a test run never spends the proxy's quota.
 
 ```bash
 npm install --no-save playwright && npx playwright install chromium
+# Any Chromium already on disk works too: CHROME=/path/to/chrome node tools/harness/...
 npm run build                                   # the new build, in dist/
 
 # False alarms: real sites, blocklists on (as users have them)
@@ -21,6 +22,21 @@ NOFEED=1 OLD=../pagida-v3/dist NEW=dist SITES=phish.txt OUT=phish.json node tool
 ```
 
 Each finished page is appended to `<OUT>l` (JSON lines) as it completes.
+
+Add `SAVE_TEXT=pages.jsonl` to also keep each page's title and visible text
+(the text the page model scores), for testing the model on today's pages.
+
+`timing.cjs` measures how long each verdict takes to arrive on a first visit:
+`EXT=dist SITES=list.txt OUT=timing.json node tools/harness/timing.cjs`.
+
+`try-it.cjs` (`npm run try`) is for trying Pagida by hand. It opens a separate
+test browser with the built extension and the Pagida service off, serves the
+attack pages and the mock webmail itself, and opens a start page that lists
+every test page with what Pagida should say about it.
+
+`store-shots.cjs` makes the store screenshots from the real build, at 1280 x
+800 with a caption: `EXT=dist OUT=docs/store node tools/harness/store-shots.cjs`
+(attack pages on :8098 and the mock webmail on :8443 first).
 
 `attack-pages/` holds one page per attack type v5 detects (ClickFix, copied
 sign-in pages, recovery-phrase theft, fake virus warning, fake pop-up window,

@@ -9,6 +9,7 @@
  * than break the inbox.
  */
 import type { EmailEvidence, EmailLink } from '../../email/types.js';
+import type { ReaderFacts } from '../../email/health.js';
 import { unwrapLink } from '../../email/links.js';
 
 export interface OpenMessage {
@@ -140,6 +141,32 @@ export function readOutlook(): OpenMessage[] {
     });
   }
   return out;
+}
+
+/** What the health check needs to know, read from markers that outlive a redesign. */
+export function readerFacts(messagesRead: number, msSinceNavigation: number): ReaderFacts | null {
+  const host = location.hostname;
+  if (host === 'mail.google.com') {
+    return {
+      client: 'gmail',
+      // "#inbox/FMfcgzQ…" or a legacy 16-hex id as the last part. Label names
+      // usually carry "_", "-" or "%20", which keeps "#label/my_newsletters" out.
+      urlSaysOpen: /\/(?:[A-Za-z]{2,}[A-Za-z0-9]{20,}|[0-9a-f]{16})$/.test(location.hash),
+      bodiesSeen: document.querySelectorAll('[data-message-id], [data-legacy-message-id]').length,
+      messagesRead,
+      msSinceNavigation,
+    };
+  }
+  if (/^outlook\.(?:live|office|office365)\.com$/.test(host)) {
+    return {
+      client: 'outlook',
+      urlSaysOpen: /\/id\//.test(location.pathname),
+      bodiesSeen: document.querySelectorAll('div[aria-label="Message body"], div[aria-label="Message Body"]').length,
+      messagesRead,
+      msSinceNavigation,
+    };
+  }
+  return null;
 }
 
 export function readOpenMessages(): OpenMessage[] {

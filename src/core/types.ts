@@ -8,6 +8,8 @@
  */
 
 /** Which layer of analysis produced a signal. */
+import type { Familiarity } from './history.js';
+
 export type Tier = 'url' | 'dom' | 'reputation' | 'user';
 
 /**
@@ -92,6 +94,10 @@ export interface PageEvidence {
   userReported?: boolean;
   /** The user explicitly marked this host as safe. */
   userTrusted?: boolean;
+  /** This person's own history with this site or item (set by the worker, from local memory). */
+  history?: Familiarity;
+  /** How this page was reached, when Pagida saw the click (a link in an email it checked). */
+  arrival?: { fromEmail: true; emailBand: Band; emailWarned: boolean };
 }
 
 /** Signals extracted from the live page by the content script. */
@@ -134,6 +140,15 @@ export interface DomEvidence {
   logoBrands?: string[];
   /** Absolute URL of the favicon, so the worker can fingerprint it. */
   faviconUrl?: string;
+  /** A visible field labelled as a password that is not a password box (how online-form phishing asks). */
+  formAsksPassword?: boolean;
+  /** A visible field asking for an email address or username. */
+  formAsksEmail?: boolean;
+  /**
+   * A site the person really signs in to whose tab icon this page wears, on a
+   * different site (set by the worker from the local sign-in memory).
+   */
+  copiesSignInSite?: string;
   /** What the page asks for on screen, beyond a password. */
   asksCard?: boolean;
   asksOneTimeCode?: boolean;
@@ -207,7 +222,7 @@ export interface Verdict {
    * Set when a user override changed the outcome.
    *  - `trusted`   the user's mark stood, and heuristics were suppressed
    *  - `overruled` the user marked it safe, but confirmed intelligence says
-   *                otherwise and wins — see the note in score.ts
+   *                otherwise and wins, see the note in score.ts
    *  - `reported`  the user reported it themselves
    */
   override?: 'reported' | 'trusted' | 'overruled';

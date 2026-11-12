@@ -7,12 +7,12 @@
  * The re-scanning here is deliberately conservative. An earlier version simply
  * re-reported whenever the DOM mutated and a password field was present, which
  * on any page with an ad carousel or a live region meant scoring the same page
- * over and over — burning CPU and firing a fresh RDAP lookup each time. It now
+ * over and over, burning CPU and firing a fresh RDAP lookup each time. It now
  * re-reports only when something the engine would actually score has changed,
  * and never more than a handful of times per page.
  */
 import { extractDomEvidence, extractTechFacts } from './extract.js';
-import { noteClipboard } from './offline.js';
+import { faviconUrl, noteClipboard } from './offline.js';
 import { hideCompanion, showCompanion } from './companion.js';
 import { evidenceSignature } from '../../core/evidence.js';
 import type { Message } from '../../shared/messages.js';
@@ -54,13 +54,21 @@ function schedule(delay = SETTLE_MS, force = false): void {
 // cloned Microsoft and Google sign-in pages fade their form in after a loading
 // animation, and the first look sees it hidden. The signature check drops
 // these when nothing changed, so a normal page still reports once.
+//
+// The first look happens as soon as the page's own content is there, without
+// waiting for every image and advert to finish (the browser's "load" event,
+// which on a heavy page takes seconds). The later looks, and one more at
+// "load", still catch anything that arrives late, so the final answer is the
+// same; it just starts sooner.
 function initialPasses(): void {
-  schedule(150);
+  schedule(100);
   setTimeout(() => { if (timer === undefined) report(); }, 1800);
   setTimeout(() => { if (timer === undefined) report(); }, 4500);
+  if (document.readyState !== 'complete') {
+    window.addEventListener('load', () => { if (timer === undefined) schedule(150); }, { once: true });
+  }
 }
-if (document.readyState === 'complete') initialPasses();
-else window.addEventListener('load', initialPasses, { once: true });
+initialPasses();
 
 /**
  * Catch two things only: a single-page-app navigation, and a credential form
@@ -90,7 +98,9 @@ if (document.documentElement) {
 // The clipboard watcher in the page's own world reports here when a page puts
 // a command on the clipboard. Re-score at once: this is the moment that matters.
 window.addEventListener('message', (e: MessageEvent) => {
-  if (e.source !== window) return;
+  // This page, or a frame of this same site (the guard in a frame reports to
+  // the top window). Frames from other sites are not allowed to speak for it.
+  if (e.source !== window && e.origin !== location.origin) return;
   const d = e.data as { source?: string; text?: unknown } | null;
   if (!d || d.source !== 'pagida-clipboard' || typeof d.text !== 'string') return;
   noteClipboard(d.text);
@@ -114,7 +124,7 @@ chrome.runtime.onMessage.addListener((msg: Message, _sender, sendResponse) => {
     hideCompanion();
   } else if (msg.type === 'RESCAN') {
     // The popup asks for this when the service worker has no verdict for the
-    // tab — after a worker restart, or after the extension was reloaded while
+    // tab, after a worker restart, or after the extension was reloaded while
     // the page stayed open. Without it the popup silently degrades to an
     // address-only score and the page tier is never applied.
     report(true);
@@ -123,3 +133,25 @@ chrome.runtime.onMessage.addListener((msg: Message, _sender, sendResponse) => {
   }
   return undefined;
 });
+
+// ---------------------------------------------------------------- sign-ins
+
+// When the person signs in here, the worker may remember this site (only if it
+// already judged the page fine) so a copy of it can be recognised later. Sent
+// once per page, and only the address and icon address: never what was typed.
+let signInSent = false;
+function passwordTyped(root: ParentNode = document): boolean {
+  return Array.from(root.querySelectorAll<HTMLInputElement>('input[type="password"]')).some((i) => i.value.length > 0);
+}
+function noteSignIn(): void {
+  if (signInSent || !passwordTyped()) return;
+  signInSent = true;
+  void chrome.runtime.sendMessage({ type: 'SIGNED_IN', url: location.href, faviconUrl: faviconUrl() } satisfies Message).catch(() => { signInSent = false; });
+}
+document.addEventListener('submit', noteSignIn, true);
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') noteSignIn();
+}, true);
+document.addEventListener('click', (e) => {
+  if ((e.target as HTMLElement | null)?.closest?.('button, input[type="submit"], [role="button"]')) noteSignIn();
+}, true);

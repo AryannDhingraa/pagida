@@ -2,7 +2,7 @@
  * What is actually running at an IP address, from Shodan's InternetDB.
  *
  * Free, keyless, CORS-enabled, and read-only: it returns what Shodan already
- * knows from its own scanning. Pagida never scans anything itself — probing a
+ * knows from its own scanning. Pagida never scans anything itself: probing a
  * third party's infrastructure without authorisation is a criminal offence in
  * Australia and most other places, and a defensive tool has no business doing
  * it. This is a lookup of someone else's public dataset, nothing more.

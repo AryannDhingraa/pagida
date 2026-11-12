@@ -10,17 +10,22 @@ and the evaluation scripts run the exact code the extension ships.
 ```
 src/
 ├── core/                 the web engine: pure TypeScript, no browser APIs
-│   ├── rules/            url · dom · offline · reputation · compound
+│   ├── rules/            url · dom · offline · reputation · compound · context
 │   ├── util/             domain parsing, edit distance, homographs, entropy, networks
-│   ├── data/             brands, login fingerprints, logo hashes, TLDs, allowlist, PSL
+│   ├── data/             brands, login fingerprints, logo hashes, TLDs, allowlist, PSL,
+│   │                     official (gov/edu) suffixes, brands' DMARC policies
 │   ├── evidence.ts       URL → PageEvidence
 │   ├── score.ts          PageEvidence → Verdict (signals, conclusions, band)
 │   ├── conclusions.ts    the one-sentence reasons that may raise a warning
+│   ├── history.ts        the site memory: what counts as "yours", per-item keys
+│   ├── familiar.ts       copies of the sites you sign in to (icon matching)
+│   ├── dmarc.ts          reading a DMARC record, and whether a sender can be faked
 │   └── wording.ts        band names, headlines, advice (small, for the page script)
 ├── email/                the email engine: pure, same discipline as core
 │   ├── types.ts          EmailEvidence in, EmailVerdict out
 │   ├── patterns.ts       word lists and patterns (free mail, trackers, lures)
 │   ├── links.ts          unwrapping Gmail / Safe Links / Proofpoint redirects
+│   ├── health.ts         is the webmail reader still reading emails?
 │   └── evaluate.ts       EmailEvidence + link findings → EmailVerdict
 ├── learned/              the trained text models
 │   ├── tokenize.ts       hashing tokenizer, identical to the Python trainer
@@ -30,19 +35,28 @@ src/
 │   ├── page/             every web page: reads the page, ClickFix guard, Iris on the page
 │   └── mail/             Gmail and Outlook only: adapters, banner, link guard
 ├── background/           service worker: orchestration, lookups, icon, menus
-├── services/             blocklists, feeds, RDAP, Pagida service, QR decoding, reports
+├── services/             blocklists, feeds, RDAP, DMARC, Pagida service, QR decoding,
+│                         reports, the scrambled site memory and sign-in store
 ├── ui/                   Iris and shared UI pieces
 ├── popup/ options/ report/
+├── managed-schema.json   what a company can set through Chrome policy
 └── manifest.json
 
 scripts/
-├── build.mjs                 esbuild bundles into dist/ (OUTDIR to override)
+├── build.mjs                 esbuild bundles into dist/ (OUTDIR to override, TARGET=firefox)
+├── build-allowlist.ts        Tranco top sites → src/core/data/allowlist.ts
+├── build-psl.mjs             Public Suffix List → src/core/data/psl.ts
+├── build-dmarc.ts            brands' DMARC records → src/core/data/dmarc.ts
+├── build-privacy-page.py     PRIVACY.md → docs/privacy.html
 ├── evaluate.ts               URL-tier evaluation on today's phishing feed
 ├── evaluate-email.ts         email-engine evaluation on labelled email sets
 ├── email-corpus.py           mbox / maildir → the JSONL the email evaluator reads
 └── train-text-models.py      trains and exports the two text models
 
 tools/harness/                real-browser tests (see its README)
+tools/data/                   one-off data collection (brand favicon hashes)
+proxy/worker.js               copy of the Pagida service (the Cloudflare Worker)
+docs/                         the GitHub Pages site and the privacy policy
 ```
 
 ## How a web page is checked

@@ -6,7 +6,7 @@
  * redistributing someone else's threat data inside an extension package raises
  * licensing questions we don't need to have.
  *
- * The lookup itself is entirely local — the feed is downloaded once a day and
+ * The lookup itself is entirely local: the feed is downloaded once a day and
  * matched in memory, so no URL you visit is ever sent anywhere.
  */
 const FEED_URL = 'https://raw.githubusercontent.com/openphish/public_feed/main/feed.txt';

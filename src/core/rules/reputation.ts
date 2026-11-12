@@ -1,5 +1,5 @@
 /**
- * Tier 3 — reputation rules.
+ * Tier 3: reputation rules.
  *
  * Two different kinds of thing live in here and the difference matters. Domain
  * age is an inference: young domains correlate with phishing, and plenty of
@@ -14,6 +14,8 @@
  */
 import type { Rule, Signal } from '../types.js';
 import { asksForSecret } from '../identity.js';
+import { parseHost } from '../util/domain.js';
+import { freeHostOf } from '../util/entropy.js';
 
 const sig = (s: Signal): Signal => s;
 
@@ -58,11 +60,14 @@ export const newlyRegisteredDomain: Rule = (e) => {
   });
 };
 
-/** Established domains earn a small credit — this is the one negative weight. */
+/** Established domains earn a small credit: this is the one negative weight. */
 export const establishedDomain: Rule = (e) => {
   const age = e.domainAgeDays;
   if (age === undefined || age === null) return null;
   if (age < 730) return null;
+  // On a free host the age is the platform's, not the page owner's.
+  const { suffix, registrableDomain } = parseHost(e.hostname);
+  if (freeHostOf(e.hostname, suffix, registrableDomain)) return null;
   return sig({
     id: 'domain_well_established',
     title: `Domain has existed for ${Math.floor(age / 365)} years`,
@@ -87,7 +92,7 @@ export const feedUrlMatch: Rule = (e) => {
   });
 };
 
-/** Hostname match — broader, so weighted lower than an exact URL match. */
+/** Hostname match: broader, so weighted lower than an exact URL match. */
 export const feedHostMatch: Rule = (e) => {
   if (!e.feedHostHit || e.feedUrlHit) return null;
   return sig({
@@ -122,8 +127,8 @@ export const safeBrowsingMatch: Rule = (e) => {
  *
  * Weighted just under Safe Browsing's own rule for the plain reason that this
  * lookup is domain-level: Web Risk was asked about the site, not the exact
- * page. That is still a very strong signal — Google does not list a domain on
- * a hunch — but a compromised subpage of a large host is the case where a
+ * page. That is still a very strong signal: Google does not list a domain on
+ * a hunch, but a compromised subpage of a large host is the case where a
  * URL-level answer would be sharper.
  */
 export const webRiskMatch: Rule = (e) => {

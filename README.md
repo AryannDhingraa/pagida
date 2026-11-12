@@ -7,7 +7,7 @@
 **A phishing detector for Chrome that shows its working.**
 
 Iris checks every page you open and tells you, in a sentence, whether to trust
-it — then shows you every single reason behind that answer. No account, no
+it, then shows you every single reason behind that answer. No account, no
 tracking. Since v5 the whole engine runs offline on your machine: copied
 sign-in pages, fake CAPTCHAs that try to make you run a command, fake virus
 warnings and recovery-phrase thieves are all caught without asking a server.
@@ -18,7 +18,7 @@ Since v6 it also checks the emails you open in Gmail and Outlook on the web.
 [![Manifest V3](https://img.shields.io/badge/manifest-v3-blue.svg)](src/manifest.json)
 [![Tests](https://img.shields.io/badge/tests-218%20passing-brightgreen.svg)](test)
 
-*παγίδα — Greek for "trap".*
+*παγίδα: Greek for "trap".*
 
 **[Install from the Chrome Web Store](https://chromewebstore.google.com/detail/bcjboonbeegdjfcgijbbeccpcighafll)** · [What changed in v6](CHANGELOG.md)
 
@@ -48,7 +48,7 @@ Pagida scores the page you are on against **38 rules across three tiers, plus a 
 shows you the verdict, the score, and every single rule that fired with the
 actual evidence that made it fire.
 
-Two things it does differently. The first is Iris — she sits in the toolbar, her
+Two things it does differently. The first is Iris. She sits in the toolbar, her
 expression changes with the risk before you have read anything, and she steps
 onto the page itself when something is genuinely wrong. The second is that the
 reasoning is all there, in ordinary words:
@@ -81,7 +81,7 @@ leaves your computer.
 
 A verdict tells you what to do. A report tells you why you should believe it.
 Open it from the popup and Pagida gathers everything it can find about a domain
-from free public sources — no key, no account, nothing sent but the domain name
+from free public sources, with no key, no account and nothing sent but the domain name
 and an IP address:
 
 | Tab | What it answers |
@@ -97,7 +97,7 @@ someone judge a site for themselves.
 
 ## Install
 
-**From the Chrome Web Store** — [Pagida on the Chrome Web Store](https://chromewebstore.google.com/detail/bcjboonbeegdjfcgijbbeccpcighafll).
+**From the Chrome Web Store**: [Pagida on the Chrome Web Store](https://chromewebstore.google.com/detail/bcjboonbeegdjfcgijbbeccpcighafll).
 
 **From source:**
 
@@ -111,6 +111,25 @@ npm run build
 Then open `chrome://extensions`, turn on **Developer mode**, click **Load
 unpacked**, and select the `dist` folder.
 
+## For organisations
+
+IT can install Pagida on every managed Chrome or Edge with the
+`ExtensionInstallForcelist` policy, and set it up through the extension's own
+policy (`managed-schema.json`). Anything set there is applied and shown as
+locked in Options.
+
+```json
+{
+  "settings": { "checkEmail": true, "usePagidaService": true, "rememberSignIns": true },
+  "orgDomains": ["acme.com.au", "acme-group.net"]
+}
+```
+
+`orgDomains` lists the organisation's own domains. Its sites and its senders
+are treated like sites a person marked as safe, so internal tools on unusual
+domains and mail from a second company domain do not raise false alarms. The
+known-scam lists still apply to them.
+
 ## How the scoring works
 
 Four layers. The first two are free, instant and entirely offline; the third
@@ -120,7 +139,7 @@ not add points at all.
 ### The fourth layer is the one that matters
 
 Adding up weights is fine for ranking suspicion and useless as a claim about the
-world. `62` does not mean "62% likely to be phishing" — it means some rules
+world. `62` does not mean "62% likely to be phishing". It means some rules
 fired and their numbers added up. Pagida's own evaluation shows where that
 breaks: on address evidence alone, almost nothing reaches the top band, because
 no single cosmetic observation deserves to interrupt anybody and raising the
@@ -135,14 +154,14 @@ actual attack across independent observations and impose a *floor* on the band:
 
 Each part of that is unremarkable alone. Together there is no innocent reading,
 and Pagida says so in those words rather than showing you a number. Every
-conclusion has to be a sentence a person would accept as a reason — if it needs
+conclusion has to be a sentence a person would accept as a reason. If it needs
 hedging, it is a heuristic and it belongs in a rule with a weight.
 
 The popup shows the score, and underneath it says what the evidence is actually
 worth: *confirmed* (an outside source identified this), *strong*, *moderate*, or
-*weak — surface details only*.
+*weak: surface details only*.
 
-### Tier 1 — the address (21 rules, offline)
+### Tier 1: the address (21 rules, offline)
 
 | Signal | Weight |
 |---|---:|
@@ -168,7 +187,7 @@ worth: *confirmed* (an outside source identified this), *strong*, *moderate*, or
 | Machine-looking domain name, deep subdomain nesting, very long URL | +5…8 |
 | Shortened link | +5 |
 
-### Tier 2 — the page itself (9 rules, offline)
+### Tier 2: the page itself (9 rules, offline)
 
 | Signal | Weight |
 |---|---:|
@@ -178,17 +197,17 @@ worth: *confirmed* (an outside source identified this), *strong*, *moderate*, or
 | Page presents itself as a brand that does not own the domain | +16…24 |
 | Sign-in page for a brand that does not own this site *(compound)* | +22 |
 | Brand-new domain asking for a password *(compound)* | +20 |
-| Navigation links all go nowhere — a copied login page | +18 |
+| Navigation links all go nowhere, like a copied login page | +18 |
 | Tab icon borrowed from another site | +14 |
 | Page blocks paste or right-click | +10…14 |
 | Hidden or zero-sized frames, obfuscated inline scripts | +9…14 |
 
-### Tier 3 — reputation (6 rules, network)
+### Tier 3: reputation (6 rules, network)
 
 | Signal | Weight | Sends |
 |---|---:|---|
 | Google Safe Browsing threat match | +85 | The full URL, to Google. **Off unless you add your own key.** |
-| Exact URL on the OpenPhish blocklist | +80 | Nothing — the list is downloaded and matched locally. |
+| Exact URL on the OpenPhish blocklist | +80 | Nothing. The list is downloaded and matched locally. |
 | Host on the OpenPhish blocklist | +55 | Nothing. |
 | Domain registered in the last 7 / 30 / 90 days | +30 / +25 / +12 | The domain name only, to `rdap.org`. Cached for a week. |
 | Domain older than two years | **−10** | As above. |
@@ -202,7 +221,7 @@ worth: *confirmed* (an outside source identified this), *strong*, *moderate*, or
 | 30–54 | `SUSPICIOUS` | Amber `!!` badge |
 | 55–100 | `LIKELY_PHISHING` | Red `!!!` badge **and** a dismissible warning bar |
 
-Only the top band interrupts you. That is deliberate — see
+Only the top band interrupts you. That is deliberate. See
 [the evaluation](EVALUATION.md) for why.
 
 ## Measured, not asserted
@@ -212,7 +231,7 @@ can run yourself: `npm run evaluate` scores today's confirmed-phishing feed
 against 2,000 legitimate sites and 40 hand-picked real brand login pages, then
 prints precision, recall and F1 at every threshold.
 
-Latest run — **URL tier only**, on 300 confirmed phishing URLs vs 2,040 legitimate ones:
+Latest run, **URL tier only**, on 300 confirmed phishing URLs vs 2,040 legitimate ones:
 
 | Band | Threshold | Precision | Recall | False positives |
 |---|---:|---:|---:|---:|
@@ -220,7 +239,7 @@ Latest run — **URL tier only**, on 300 confirmed phishing URLs vs 2,040 legiti
 | `SUSPICIOUS` | ≥30 | **97.8%** | 30.3% | 2 / 2,040 |
 | `LIKELY_PHISHING` | ≥55 | **100%** | 2.3% | **0 / 2,040** |
 
-**0 false positives** across 40 real brand login URLs — the PayPal, myGov,
+**0 false positives** across 40 real brand login URLs: the PayPal, myGov,
 CommBank, Microsoft and AWS sign-in pages that a naive "does the URL say
 *login*?" heuristic destroys itself on.
 
@@ -232,14 +251,14 @@ what the numbers do *not* mean.
 In normal use Pagida makes three network requests, all optional, all switchable
 off in Options, and **none of them carries a page you visited**:
 
-1. **The Pagida service** — a bare domain name (`example.com`), to check
+1. **The Pagida service**: a bare domain name (`example.com`), to check
    Google's list of sites caught spreading scams and malware. That list needs a
    paid key, so Pagida holds one and asks on your behalf, free and with no
    sign-up. The server refuses any request containing a path, and stores
-   nothing — no IP, no history, no logs. Its source is in `proxy/worker.js`.
-2. **`rdap.org`** — the registrable domain only, to find out how old it is.
+   nothing: no IP, no history, no logs. Its source is in `proxy/worker.js`.
+2. **`rdap.org`**: the registrable domain only, to find out how old it is.
    Never the path, never the query string. Cached for seven days.
-3. **`raw.githubusercontent.com`** — downloads the OpenPhish public blocklist
+3. **`raw.githubusercontent.com`**: downloads the OpenPhish public blocklist
    once every 12 hours. The matching then happens on your machine.
 
 Email checking adds nothing new to that list: the email stays on your
@@ -260,7 +279,7 @@ from.
 
 ## Marking sites yourself
 
-What you say beats what Pagida thinks — with exactly one exception, and the
+What you say beats what Pagida thinks, with exactly one exception, and the
 exception is the point.
 
 Marking a site **safe** switches off everything Pagida merely *inferred* about
@@ -272,7 +291,7 @@ It does **not** switch off confirmed threat intelligence. If a site you trusted
 last year turns up on a phishing blocklist or in Google's threat data today,
 Pagida warns you anyway and tells you plainly that it is overriding your own
 mark. That case is almost always a legitimate site that has been compromised
-since — which is precisely the scenario the tool exists for, and staying quiet
+since, which is precisely the scenario the tool exists for, and staying quiet
 through it would be the worst thing it could do.
 
 Marking a site as **phishing** warns you about it from then on, and offers to
@@ -285,16 +304,16 @@ exportable as JSON.
 
 | Permission | Why |
 |---|---|
-| `storage` | Your settings, the cached blocklist, and the sites you have marked. Local only — never synced. |
+| `storage` | Your settings, the cached blocklist, and the sites you have marked. Local only, never synced. |
 | `contextMenus` | The two right-click items for checking and reporting a link. |
 | `alarms` | Refreshing the blocklist every 12 hours. |
-| `content_scripts` on all http/https pages | A phishing detector has to be able to look at the page you are on. It reads the page and sends a fixed-shape summary — never page text, never form values. |
+| `content_scripts` on all http/https pages | A phishing detector has to be able to look at the page you are on. It reads the page and sends a fixed-shape summary, never page text, never form values. |
 | `https://rdap.org/*` | Domain-age lookups. |
 | `https://raw.githubusercontent.com/*` | The OpenPhish blocklist. |
 | `https://safebrowsing.googleapis.com/*` | Only used if you enable Safe Browsing and provide a key. |
-| `https://cloudflare-dns.com/*` | DNS lookups for the site report — mail records, SPF, DMARC. |
+| `https://cloudflare-dns.com/*` | DNS lookups for the site report: mail records, SPF, DMARC. |
 | `https://internetdb.shodan.io/*` | Reads Shodan's public record of an IP for the site report. Pagida never scans anything itself. |
-| `https://crt.sh/*` | Certificate history for the site report — when a site first went live. |
+| `https://crt.sh/*` | Certificate history for the site report: when a site first went live. |
 
 There is no `tabs` permission. Pagida never reads your tab list or your history.
 
@@ -322,7 +341,7 @@ numbers measure the shipped engine rather than a reimplementation of it.
 
 ```bash
 npm install
-npm run dev          # rebuild on change — load dist/ as an unpacked extension
+npm run dev          # rebuild on change, then load dist/ as an unpacked extension
 npm test             # 218 unit tests
 npm run typecheck
 npm run lint
@@ -330,7 +349,8 @@ npm run evaluate     # fetch today's feeds and re-measure the address tier
 python3 scripts/train-text-models.py --data ../data   # retrain both text models
 node scripts/run-ts.mjs scripts/evaluate-email.ts     # measure the email engine (see EVALUATION.md)
 npm run build:allowlist   # regenerate the well-known-domain list
-npm run zip          # package for the Chrome Web Store
+npm run zip          # package for the Chrome Web Store and Edge Add-ons
+npm run zip:firefox  # Firefox package, built into dist-firefox/
 ```
 
 ## Known limitations
@@ -380,13 +400,14 @@ blind spots is worse than one that has them.
 
 ## Roadmap
 
-- [ ] **Measure the whole engine, not just the URL tier** — an archived page
+- [ ] **Measure the whole engine, not just the URL tier**: an archived page
       corpus replayed offline, so the conclusions layer has a real hit rate
       instead of only unit tests
 - [x] Chrome Web Store listing
-- [ ] Miner and skimmer detection — the one thing Netcraft does that Pagida does not
-- [ ] Firefox build — the code is MV3, the manifest needs a variant
-- [ ] Web Risk **Update API** — hash prefixes matched locally, so not even the
+- [ ] Miner and skimmer detection, the one thing Netcraft does that Pagida does not
+- [ ] Firefox: the build exists (`npm run zip:firefox`), testing in Firefox and an AMO listing are next
+- [ ] Microsoft Edge Add-ons: the Chrome package, as is
+- [ ] Web Risk **Update API**: hash prefixes matched locally, so not even the
       domain leaves the machine
 - [ ] A second opinion tier: optional VirusTotal and urlscan.io enrichment,
       user-keyed, because their terms do not allow proxying
@@ -403,7 +424,7 @@ the other way round.
 **Google Safe Browsing is free for non-commercial use only.** Pagida offers the
 threat-list check to everyone through a proxy it runs, and offering a service to
 other people counts as commercial even when nobody is charged. So the proxy uses
-**Google Web Risk** instead, whose free tier explicitly permits commercial use —
+**Google Web Risk** instead, whose free tier explicitly permits commercial use:
 100,000 lookups a month. Safe Browsing is still available for anyone who supplies
 their own key and wants the check done page-by-page, which is a personal,
 non-commercial use and stays inside its terms.
@@ -412,13 +433,13 @@ non-commercial use and stays inside its terms.
 the VirusTotal tier on the roadmap below is marked optional and user-keyed: it
 can never be something Pagida provides on someone's behalf.
 
-Every other source — RDAP, Cloudflare DNS, crt.sh, Shodan InternetDB, ipwho.is,
-the Wayback Machine, URLhaus and OpenPhish — is free and keyless with no such
+Every other source (RDAP, Cloudflare DNS, crt.sh, Shodan InternetDB, ipwho.is,
+the Wayback Machine, URLhaus and OpenPhish) is free and keyless with no such
 restriction.
 
 ## Contributing
 
-Issues and pull requests welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). If
+Issues and pull requests welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). If
 you have found a security problem in Pagida itself, [SECURITY.md](SECURITY.md)
 tells you how to report it.
 

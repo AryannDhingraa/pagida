@@ -1,6 +1,6 @@
 /**
  * Builds the URL half of a PageEvidence object. Pure, synchronous, and safe to
- * call on a URL you have never visited — which is what the right-click
+ * call on a URL you have never visited, which is what the right-click
  * "check this link" feature relies on.
  */
 import type { DomEvidence, PageEvidence } from './types.js';
@@ -50,7 +50,7 @@ export function evidenceFromUrl(url: string): PageEvidence | null {
  *
  * The content script uses this to decide whether a DOM mutation is worth
  * re-scoring. Without it, any page with an ad carousel or a live region
- * re-reports continuously — which in an early build meant eight scores and
+ * re-reports continuously, which in an early build meant eight scores and
  * eight domain lookups for a single page load.
  *
  * Floats are quantised so that a one-pixel layout shift, which nudges the
@@ -72,7 +72,7 @@ export function evidenceSignature(url: string, dom: DomEvidence): string {
     Math.round(dom.deadLinkRatio * 20),
     (dom.loginFingerprints ?? []).join(','),
     (dom.brandAssets ?? []).join(','),
-    dom.asksCard ? 1 : 0, dom.asksOneTimeCode ? 1 : 0, dom.asksSeedPhrase ? 1 : 0,
+    dom.asksCard ? 1 : 0, dom.asksOneTimeCode ? 1 : 0, dom.asksSeedPhrase ? 1 : 0, dom.formAsksPassword ? 1 : 0,
     dom.exfilTarget ?? '', dom.botExfil ? 1 : 0,
     dom.clickFix ? 1 : 0, dom.clipboardCommand ? 1 : 0,
     dom.techSupportScam ? 1 : 0, dom.documentLure ? 1 : 0, dom.cryptoLure ? 1 : 0,

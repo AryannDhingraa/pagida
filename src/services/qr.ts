@@ -8,11 +8,19 @@
  * was opened.
  */
 import jsQR from 'jsqr';
+import { isPrivateHost } from '../core/util/network.js';
 
 const MAX_SIDE = 800;
 
 export async function decodeQr(imageUrl: string): Promise<string | null> {
   try {
+    // An email chooses its own image addresses. The worker can reach machines
+    // on the home or office network that a web page cannot, so it never
+    // fetches an address there on an email's say-so.
+    if (!imageUrl.startsWith('data:')) {
+      const { protocol, hostname } = new URL(imageUrl);
+      if (!/^https?:$/.test(protocol) || isPrivateHost(hostname)) return null;
+    }
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 3000);
     const res = await fetch(imageUrl, { credentials: 'omit', referrerPolicy: 'no-referrer', signal: controller.signal });

@@ -1,5 +1,5 @@
 /**
- * Tier 1 — URL and domain rules.
+ * Tier 1: URL and domain rules.
  *
  * These need nothing but the address bar: no network, no page content, no
  * permissions. They run on every navigation and on any link the user asks about
@@ -9,7 +9,7 @@ import type { Rule, Signal } from '../types.js';
 import { parseHost } from '../util/domain.js';
 import { editDistance } from '../util/levenshtein.js';
 import { hasConfusables, isMixedScript, isPunycode, skeleton } from '../util/homograph.js';
-import { FREE_HOSTING_SUFFIXES, looksGenerated } from '../util/entropy.js';
+import { freeHostOf, looksGenerated } from '../util/entropy.js';
 import {
   BRAND_DOMAINS, BRAND_TOKENS, domainsForToken,
   CHEAP_ABUSE_TLDS, FREE_TLDS, isWellKnown, RISKY_DOWNLOAD_EXTENSIONS, URL_SHORTENERS,
@@ -52,7 +52,7 @@ export const ipLiteralHost: Rule = (e) => {
   });
 };
 
-/** Punycode or mixed alphabets in the hostname — the homograph attack. */
+/** Punycode or mixed alphabets in the hostname: the homograph attack. */
 export const homographHost: Rule = (e) => {
   const labels = e.hostname.split('.');
   const punycoded = labels.some(isPunycode);
@@ -60,7 +60,7 @@ export const homographHost: Rule = (e) => {
 
   // Mixed alphabets inside one label is the actual attack: a Latin-looking name
   // with two Cyrillic characters hidden in it. Plain punycode is just an
-  // internationalised domain — millions of them are entirely legitimate — so it
+  // internationalised domain, millions of them are entirely legitimate, so it
   // gets a fraction of the weight and a different explanation.
   if (mixed) {
     return sig({
@@ -114,7 +114,7 @@ export const brandTyposquat: Rule = (e) => {
   if (isTrustedName(registrableDomain)) return null; // it *is* the brand, or a top site
 
   const foldedSld = skeleton(sld);
-  // Short labels are the main source of false typosquat matches — `mail.ru` is
+  // Short labels are the main source of false typosquat matches: `mail.ru` is
   // one edit from `gmail`, and it is not pretending to be Gmail. Requiring five
   // characters on both sides, similar lengths, and a distance proportionate to
   // the length is what makes this rule safe to weight heavily.
@@ -235,7 +235,7 @@ export const brandInDomainName: Rule = (e) => {
   return null;
 };
 
-/** `https://paypal.com@evil.tk/` — the browser goes to evil.tk. */
+/** `https://paypal.com@evil.tk/`: the browser goes to evil.tk. */
 export const embeddedCredentials: Rule = (e) => {
   if (!e.hasEmbeddedCredentials) return null;
   return sig({
@@ -331,7 +331,7 @@ export const noisyDomain: Rule = (e) => {
   });
 };
 
-/** URL shortener — hides the destination. Informational weight only. */
+/** URL shortener: hides the destination. Informational weight only. */
 export const urlShortener: Rule = (e) => {
   const { registrableDomain } = parseHost(e.hostname);
   if (!URL_SHORTENERS.has(registrableDomain)) return null;
@@ -389,7 +389,7 @@ export const confusableCharacters: Rule = (e) => {
 
 /**
  * Directories that only exist inside a WordPress installation. A user-facing
- * page is never legitimately served from `/wp-includes/` — when one is, the
+ * page is never legitimately served from `/wp-includes/`. When one is, the
  * site has almost certainly been compromised and is hosting someone else's
  * phishing kit. This is the single highest-recall URL signal for modern
  * phishing, which overwhelmingly runs on hacked WordPress sites rather than on
@@ -421,15 +421,16 @@ export const compromisedCmsPath: Rule = (e) => {
   return null;
 };
 
-/** Free, instant, anonymous hosting — where disposable phishing pages live. */
+/** Free, instant, anonymous hosting: where disposable phishing pages live. */
 export const freeHostingSubdomain: Rule = (e) => {
   const { registrableDomain, suffix, isIpLiteral } = parseHost(e.hostname);
   if (isIpLiteral || BRAND_DOMAINS.has(registrableDomain)) return null;
-  if (!FREE_HOSTING_SUFFIXES.has(suffix)) return null;
+  const host = freeHostOf(e.hostname, suffix, registrableDomain);
+  if (!host) return null;
   return sig({
     id: 'free_hosting_subdomain',
-    title: `Hosted free on ${suffix}`,
-    detail: `Anyone can publish a page on ${suffix} in minutes, anonymously and at no cost. Plenty of real projects do, but so does most disposable phishing.`,
+    title: `Hosted free on ${host}`,
+    detail: `Anyone can publish a page on ${host} in minutes, anonymously and at no cost. Plenty of real projects do, but so does most disposable phishing.`,
     tier: 'url',
     weight: 12,
   });
@@ -457,13 +458,13 @@ export const generatedDomainLabel: Rule = (e) => {
 };
 
 /**
- * Long, high-entropy path segments — `/v/60f84723f9ab9f904044f710f98efb70` or a
+ * Long, high-entropy path segments, `/v/60f84723f9ab9f904044f710f98efb70` or a
  * 60-character base64-looking blob. Phishing kits use these as per-victim
  * tokens, so the same page can be served uniquely to each target and taken down
  * selectively. Legitimate sites use readable slugs.
  */
 export const generatedPathSegment: Rule = (e) => {
-  // Every real single-page app puts opaque ids in the path — a Google AI Studio
+  // Every real single-page app puts opaque ids in the path: a Google AI Studio
   // prompt, a Notion page, a Figma file. On a domain that is demonstrably real
   // this signal carries no information at all, and firing it there is how a
   // phishing detector loses the user's trust.
@@ -500,7 +501,7 @@ export const generatedPathSegment: Rule = (e) => {
  * An email address sitting in the URL.
  *
  * Phishing links are sent to a list, and the kit needs to know who clicked, so
- * the victim's own address is embedded in the link — `?email=you@work.com`. The
+ * the victim's own address is embedded in the link: `?email=you@work.com`. The
  * page then pre-fills the login form with it, which is what makes the page
  * convincing. Legitimate sites use opaque session tokens for this, not
  * plaintext addresses in a query string.
@@ -522,7 +523,7 @@ export const emailInUrl: Rule = (e) => {
 };
 
 /**
- * A subdomain made of several hyphenated words — `request-review-business-for.
+ * A subdomain made of several hyphenated words: `request-review-business-for.
  * case-client.com`. The registrable domain is bought once and then an unlimited
  * number of persuasive-sounding subdomains are generated under it.
  */
@@ -544,7 +545,7 @@ export const hyphenatedSubdomain: Rule = (e) => {
 
 
 /**
- * The brand name is the domain — just not the brand's domain.
+ * The brand name is the domain, just not the brand's domain.
  *
  * `netflix.support`, `paypal.live`, `commbank.top`: an exact brand name
  * registered under a generic TLD that brand does not use. This is not a typo
@@ -553,7 +554,7 @@ export const hyphenatedSubdomain: Rule = (e) => {
  * The rule deliberately ignores country-code TLDs. `google.si`, `ebay.es` and
  * `dhl.de` are all real: a global brand almost always runs its own country
  * sites, so a brand name under a two-letter ccTLD is weak evidence at best.
- * Under `.support` or `.top` it is not weak at all — no brand runs those, and
+ * Under `.support` or `.top` it is not weak at all: no brand runs those, and
  * anyone can buy one for a few dollars.
  */
 export const brandOnForeignTld: Rule = (e) => {
@@ -561,7 +562,7 @@ export const brandOnForeignTld: Rule = (e) => {
   if (isIpLiteral || !sld) return null;
   if (isTrustedName(registrableDomain)) return null;
 
-  // Skip country-code suffixes entirely — see the note above.
+  // Skip country-code suffixes entirely, see the note above.
   const lastLabel = suffix.split('.').pop() ?? '';
   if (lastLabel.length <= 2) return null;
 

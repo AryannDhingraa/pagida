@@ -200,7 +200,7 @@ describe('user overrides', () => {
   });
 });
 
-describe('conclusions — reaching danger by shape rather than by sum', () => {
+describe('conclusions: reaching danger by shape rather than by sum', () => {
   it('calls a fake brand sign-in page what it is, without needing 55 points', () => {
     const v = evaluate(page('https://account-services.com/signin',
       { hasPasswordField: true, brandTokens: ['paypal'], crossOriginPasswordForm: true }));

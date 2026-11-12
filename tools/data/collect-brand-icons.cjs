@@ -2,7 +2,7 @@
 // Chromium with the same canvas path the extension uses.
 //   npx esbuild src/core/util/dhash.ts --bundle --format=iife --global-name=__D --outfile=dhash.js
 //   echo 'self.__dhash = __D.dhashFromRgba;' >> dhash.js
-//   node docs/tools/collect-brand-icons.cjs   (writes icons.json)
+//   node tools/data/collect-brand-icons.cjs   (writes icons.json)
 const { chromium } = require('playwright');
 const fs = require('fs');
 const sites = {

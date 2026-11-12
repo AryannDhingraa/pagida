@@ -21,6 +21,7 @@ const cases = [
 
 (async () => {
   const ctx = await chromium.launchPersistentContext(fs.mkdtempSync(path.join(require('os').tmpdir(), 'pagida-mail-')), {
+    ...(process.env.CHROME ? { executablePath: process.env.CHROME } : {}),
     headless: false,
     args: ['--headless=new', `--disable-extensions-except=${EXT}`, `--load-extension=${EXT}`,
       '--host-resolver-rules=MAP mail.google.com 127.0.0.1, MAP outlook.office.com 127.0.0.1, MAP *.google.com ~NOTFOUND',

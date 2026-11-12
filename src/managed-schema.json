@@ -1,0 +1,58 @@
+{
+  "type": "object",
+  "properties": {
+    "settings": {
+      "title": "Pagida settings set by your organisation",
+      "description": "Any setting given here is applied and locked: people cannot change it in Options.",
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "sensitivity": {
+          "type": "string",
+          "enum": [
+            "relaxed",
+            "balanced",
+            "strict"
+          ]
+        },
+        "showBanner": {
+          "type": "boolean"
+        },
+        "siteReport": {
+          "type": "boolean"
+        },
+        "useRdap": {
+          "type": "boolean"
+        },
+        "useFeeds": {
+          "type": "boolean"
+        },
+        "usePagidaService": {
+          "type": "boolean"
+        },
+        "checkEmail": {
+          "type": "boolean"
+        },
+        "rememberSignIns": {
+          "type": "boolean"
+        },
+        "useDmarc": {
+          "type": "boolean"
+        },
+        "rememberHistory": {
+          "type": "boolean"
+        }
+      }
+    },
+    "orgDomains": {
+      "title": "Your organisation's own domains",
+      "description": "Sites and senders on these domains are treated like sites the person marked as safe. Known-scam lists still apply.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

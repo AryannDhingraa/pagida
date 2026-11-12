@@ -2,7 +2,7 @@
  * DOM signal extraction.
  *
  * This runs in the page. It reads, it never writes, and it sends a fixed-shape
- * summary to the service worker rather than page content — so nothing that
+ * summary to the service worker rather than page content, so nothing that
  * could contain a password, a session token or personal text ever leaves the
  * tab, not even into extension storage.
  */
@@ -134,7 +134,7 @@ function isVisible(el: Element): boolean {
 }
 
 /**
- * The brands this page presents itself AS — not every brand it mentions.
+ * The brands this page presents itself AS, not every brand it mentions.
  * See src/core/brandText.ts for why v3's version flagged Figma as Google.
  */
 function detectBrandTokens(): string[] {
@@ -220,7 +220,7 @@ function obfuscationScore(): number {
   return Math.min(1, perKb / 10);
 }
 
-/** Links that visibly exist but go nowhere — the copied-login-page tell. */
+/** Links that visibly exist but go nowhere: the copied-login-page tell. */
 function navigationHealth(): { linkCount: number; deadLinkRatio: number } {
   const anchors = Array.from(document.querySelectorAll('a'));
   if (anchors.length === 0) return { linkCount: 0, deadLinkRatio: 0 };
@@ -260,7 +260,7 @@ export function extractDomEvidence(): DomEvidence {
 // ---------------------------------------------------------------------------
 // Technology facts for the site report.
 //
-// None of this scores anything — it is there because "what is this site?" is a
+// None of this scores anything. It is there because "what is this site?" is a
 // question people actually have, and the page itself answers a lot of it for
 // free. No network call, no privacy cost: it never leaves the extension.
 // ---------------------------------------------------------------------------

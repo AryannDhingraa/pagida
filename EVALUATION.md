@@ -1,5 +1,76 @@
 # Evaluation
 
+## v6 hardening: today's live phishing (12 November 2026)
+
+Measured with `tools/harness/compare.cjs`, the committed v6 build and this
+build in the same Chromium, the same page, the same moment. The Pagida service
+and both blocklists were off, so nothing could mark its own homework. Phishing
+pages are the first 240 hosts in that morning's OpenPhish feed; a page counts
+only if it was still serving something other than a takedown or error page.
+
+| Live phishing pages | Committed v6 | This build |
+|---|---:|---:|
+| First pass, 108 live | 67 at Suspicious or worse (62.0%), 89 flagged (82.4%) | same build |
+| Rerun with the new rules, 73 still live | 42 (57.5%), 60 flagged (82.2%), 4 Likely phishing | 44 (60.3%), 61 flagged (83.6%), 6 Likely phishing |
+
+What the misses were: sign-in pages for banks and telcos no brand list knows
+(Banco de la Nación, DKB, Orange, SwissPass, Interbank), mostly on free hosts
+(vercel.app, pages.dev, netlify.app, zapier.app). The new rules name that
+directly. Most of those pages were taken down between the two passes, which is
+why the gain on the rerun is small: the rule fired on one of the few still up.
+
+Not measured yet in a browser: the sign-in copy rule, the site memory and the
+email-click context (each needs history the harness does not have), and the
+online-form password rule. All have unit tests with their honest twins.
+
+This run was made over a phone hotspot. A campus network blocked most
+phishing pages outright, so benchmarks must run on an unfiltered connection.
+
+### Final pass, with the retrained models (same evening)
+
+The same feed, all 242 hosts, retried after the models were retrained. 101
+pages were still live and scored by both builds.
+
+| 101 live phishing pages | Committed v6 | This build |
+|---|---:|---:|
+| Suspicious or worse | 65 (64.4%) | 69 (68.3%) |
+| Flagged at any level | 85 (84.2%) | 87 (86.1%) |
+| Likely phishing | 11 | 13 |
+
+Five pages went up and none went down: a DKB sign-in page on a .bj domain and
+a SwissPass page on cleverapps.io now reach Likely phishing, a Coinbase copy on
+zapier.app and a Banco Pichincha page on replit.app reach Suspicious.
+
+**False alarms, same build, same evening.** 463 real sites with the feeds on,
+353 loaded and scored by both builds. Committed v6: 345 clean, 4 Worth a look,
+4 Suspicious. This build: 344 clean, 7 Worth a look, 2 Suspicious. phys.org and
+index.hu dropped from Suspicious to Worth a look: both are top sites whose login
+form posts to another domain, and top sites are now never pushed past Worth a
+look by guesswork alone (before, that cap needed a domain age, and top sites
+are never looked up). leadpages.com showed as Worth a look once because
+its domain-age lookup failed in that one run; rerun alone, both builds call it
+clean. The two left at Suspicious are domains under a month old and are the
+same in both builds.
+
+**The retrained models.** Both now keep their 12,000 strongest weights instead
+of 6,000, chosen on held-out data with the false-positive rate as a hard limit.
+Same training and test split for both sizes:
+
+| Held-out data | 6,000 weights | 12,000 weights |
+|---|---:|---:|
+| Emails: AUC, caught, false positives | 0.992, 94.0%, 1.98% | 0.993, 94.9%, 1.77% |
+| Web pages: AUC, caught, false positives | 0.976, 91.2%, 6.90% | 0.979, 92.4%, 6.75% |
+
+The whole email engine with the new email model: 75.7% of Nazario 2025
+phishing warned (was 75.5%), 68.0% of 2024 (was 67.5%), and still 1 false
+warning in 844 held-out normal emails. On the 30 live phishing sign-in pages
+from the run above, the new page model scored 30 as phishing, the old one 29.
+
+**Speed.** Measured with `tools/harness/timing.cjs` on a fresh profile, from
+the moment the HTML arrives to the moment the worker has a verdict: the median
+went from about 1,000 ms to about 145 ms, and copied sign-in pages from 4.2 s
+to 0.14 s. No verdict changed.
+
 ## v6: email (4 November 2026)
 
 `scripts/evaluate-email.ts` runs the email engine over labelled mail and
@@ -153,7 +224,7 @@ they move as the threat landscape does.
 
 ## What is being measured, and what is not
 
-**The URL tier only** — 21 rules that work from the address alone, with no page
+**The URL tier only**: 21 rules that work from the address alone, with no page
 content and no network lookups.
 
 > ### Read this before quoting any number below
@@ -169,7 +240,7 @@ content and no network lookups.
 >
 > What actually reaches the top band in real use is the **conclusions layer**
 > (`src/core/conclusions.ts`), which correlates page content, domain age and
-> threat intelligence — none of which this harness can see. A page that scores 8
+> threat intelligence, none of which this harness can see. A page that scores 8
 > here will be called `danger` in the browser the moment the content script
 > reports a brand sign-in form posting credentials to a third party.
 >
@@ -178,7 +249,7 @@ content and no network lookups.
 > harness that opens attacker-controlled pages is a liability rather than an
 > asset. The conclusions layer is instead covered by unit tests over
 > hand-specified evidence, which proves the logic and not the hit rate. Closing
-> this gap properly — an isolated browser, an archived corpus, offline replay —
+> this gap properly (an isolated browser, an archived corpus, offline replay)
 > is the top item on the roadmap, and until it is done nobody should claim a
 > detection rate for Pagida as a whole.
 
@@ -203,7 +274,7 @@ Two exclusions are deliberate:
 ### Why the negatives start at rank 2,001
 
 Pagida bundles the top 2,000 domains as an allowlist that suppresses its
-lookalike rules — `telegraph.co.uk` sits two edits from `telegram`, and no
+lookalike rules: `telegraph.co.uk` sits two edits from `telegram`, and no
 amount of weight tuning fixes that class of false positive. Measuring against
 the same domains the engine has been told to trust would be circular, so the
 negative set is drawn from **below** the allowlist. The two sets never overlap.
@@ -220,7 +291,7 @@ https://www.commbank.com.au/digital/netbank/login
 https://www.westpac.com.au/security/report-a-scam/
 ```
 
-Long, path-heavy, and full of exactly the words a naive heuristic keys on —
+Long, path-heavy, and full of exactly the words a naive heuristic keys on:
 *signin*, *login*, *secure*, *verify*, *scam*. These are where a URL-based
 phishing detector normally falls apart, and they are the number worth quoting.
 
@@ -247,12 +318,12 @@ So the bands are chosen by **what each one costs the user**:
 
 - **≥15 shows a small badge.** A badge is cheap, so it can afford 58.7% recall
   at a 0.5% false-positive rate. This is where most real detection happens.
-- **≥30 escalates the badge.** Over 96% precision — when this fires, it is
+- **≥30 escalates the badge.** Over 96% precision: when this fires, it is
   almost always right.
 - **≥55 interrupts the page with a warning bar.** Interrupting is expensive, so
   this band is set where the URL tier alone effectively cannot reach it. In
   practice the top band is triggered by page-content evidence or a blocklist
-  match, not by address heuristics — which is exactly the intent.
+  match, not by address heuristics, which is exactly the intent.
 
 ## What these numbers do not mean
 
@@ -279,7 +350,7 @@ https://vazadasfloripa.criarsite.online/
 ```
 
 These are compromised legitimate sites and free site-builders. The domain is
-old, the registration is clean, the TLD is ordinary — the address is genuinely
+old, the registration is clean, the TLD is ordinary. The address is genuinely
 unremarkable. Only the *page* gives it away, which is precisely why Pagida has
 a page-content tier at all.
 
@@ -304,7 +375,7 @@ output is written to `eval-results.json`.
 positives        300  (OpenPhish community feed, fetched today)
 easy negatives   2000  (top sites, ranks 2001-4000)
 hard negatives   40  (real brand login and account URLs)
-allowlist        1982 domains (ranks 1-2000) — disjoint from the negatives above
+allowlist        1982 domains (ranks 1-2000), disjoint from the negatives above
 
 threshold sweep (all negatives)
   thr | precision | recall  |   F1    | FP | FN
@@ -347,7 +418,7 @@ against hard negatives only (real login pages): 0 false positive(s) out of 40
 
 best F1 in the sweep: 82.2% at threshold 5
 
-score distribution — phishing
+score distribution: phishing
     0-9   ████████████████████████████ 75
    10-19  ████████████████████████ 64
    20-29  ██████████████████████████ 70
@@ -359,7 +430,7 @@ score distribution — phishing
    80-89   0
    90-99   0
 
-score distribution — legitimate
+score distribution: legitimate
     0-9   ████████████████████████████ 1991
    10-19  █ 39
    20-29   8
