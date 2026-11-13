@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Pagida: Phishing Detector",
-  "version": "6.0.0",
+  "version": "6.0.1",
   "description": "Iris checks web pages and Gmail or Outlook emails for scams, and shows you exactly what she found. Runs on your computer.",
   "author": "Aryan Dhingra",
   "homepage_url": "https://github.com/AryannDhingraa/pagida",
