@@ -34,9 +34,20 @@ test browser with the built extension and the Pagida service off, serves the
 attack pages and the mock webmail itself, and opens a start page that lists
 every test page with what Pagida should say about it.
 
-`store-shots.cjs` makes the store screenshots from the real build, at 1280 x
-800 with a caption: `EXT=dist OUT=docs/store node tools/harness/store-shots.cjs`
-(attack pages on :8098 and the mock webmail on :8443 first).
+`store-shots.cjs` makes the six store screenshots from the real build, at
+1280 x 800: a headline, a plain browser window and Pagida's real popup, cards
+and report. The fake pages it needs are in `store-pages/` (a copied sign-in, a
+webmail screen, a fake "verify you are human" page), served over HTTPS at
+believable addresses by `store-pages/serve.py`. It also visits commbank.com.au
+and wikipedia.org for real. The Pagida service is switched off first, like
+every script here. `ONLY=04` remakes one shot.
+
+`store-tiles.cjs` draws the promo tiles, the Edge logo and a brand board with
+Iris's own code (`src/ui/iris.ts`), so she matches the extension exactly.
+
+```bash
+npm run build && node tools/harness/store-shots.cjs && node tools/harness/store-tiles.cjs
+```
 
 `attack-pages/` holds one page per attack type v5 detects (ClickFix, copied
 sign-in pages, recovery-phrase theft, fake virus warning, fake pop-up window,

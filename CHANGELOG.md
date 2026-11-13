@@ -1,5 +1,19 @@
 # Changelog
 
+## 6.0.1, November 2026
+
+- **Site age in the popup.** Some registries, including every `.au` domain,
+  publish no creation date. The popup then fell back to the first certificate
+  crt.sh returned, and crt.sh often returns only recent ones, so a bank that
+  has been online since 1996 could show as "13 months old". It now takes the
+  older of the first certificate and the first Internet Archive capture.
+  Scoring never used this number, so no verdict changes.
+- **Store images.** `tools/harness/store-shots.cjs` was rewritten: six
+  screenshots from the real build on realistic test pages served over HTTPS
+  (`tools/harness/store-pages/`), framed with a headline and a plain browser
+  window. `tools/harness/store-tiles.cjs` draws the promo tiles, the Edge logo
+  and a brand board with Iris's own code.
+
 ## 6.0.0, November 2026: email
 
 Pagida now checks the emails you open in Gmail and Outlook on the web, with

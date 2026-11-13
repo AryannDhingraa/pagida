@@ -1,0 +1,37 @@
+<!doctype html>
+<!-- A copied sign-in page, styled the way real kits are, for the store
+     screenshots. The form keeps the field ids the real page uses, which is
+     what Pagida's structure check looks for. Served by serve.py over HTTPS. -->
+<html lang="en"><head><meta charset="utf-8"><title>Sign in to your account</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #F2F2F2;
+    font: 15px/1.45 "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif; color: #1B1B1B; }
+  #lightbox { width: 440px; background: #fff; padding: 44px; box-shadow: 0 2px 6px rgba(0,0,0,.2); }
+  .brand { font-size: 13px; font-weight: 600; letter-spacing: .02em; color: #5E5E5E; margin-bottom: 18px; }
+  [role="heading"] { font-size: 24px; font-weight: 600; margin-bottom: 4px; }
+  .sub { color: #5E5E5E; margin-bottom: 22px; }
+  input[type="email"], input[type="password"] { width: 100%; border: 0; border-bottom: 1px solid #666; padding: 8px 0;
+    font: inherit; outline: none; margin-bottom: 18px; }
+  .links { font-size: 13px; color: #0067B8; margin-bottom: 26px; }
+  .row { display: flex; justify-content: flex-end; }
+  #idSIButton9 { background: #0067B8; color: #fff; border: 0; padding: 8px 36px; font: inherit; cursor: pointer; }
+  .foot { margin-top: 18px; width: 440px; background: #fff; padding: 14px 44px; box-shadow: 0 2px 6px rgba(0,0,0,.2); font-size: 13px; }
+</style></head>
+<body>
+<div>
+  <div id="lightbox">
+    <img alt="" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" width="1" height="1">
+    <div class="brand">Office 365</div>
+    <div role="heading">Sign in</div>
+    <div class="sub">to continue to Outlook</div>
+    <form name="f1" method="post" action="">
+      <input type="email" name="loginfmt" id="i0116" placeholder="Email, phone, or Skype" value="">
+      <input type="password" name="passwd" id="i0118" placeholder="Password">
+      <div class="links">Can't access your account?</div>
+      <div class="row"><input type="submit" id="idSIButton9" value="Next"></div>
+    </form>
+  </div>
+  <div class="foot">Sign-in options</div>
+</div>
+</body></html>

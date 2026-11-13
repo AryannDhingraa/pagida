@@ -197,8 +197,12 @@ async function loadQuickFacts(url: string): Promise<void> {
   }
   const r = res.report;
 
-  // How old, registration first, then the earliest certificate, then the archive.
-  const age = r.registration?.ageDays ?? r.certs?.ageDays ?? r.archive?.ageDays;
+  // How old: the registration date when the registry publishes one. Some, like
+  // .au, do not; then the older of the first certificate and the first archive
+  // capture, because crt.sh often returns only recent certificates and would
+  // make a 30-year-old bank look a year old.
+  const fallback = [r.certs?.ageDays, r.archive?.ageDays].filter((d): d is number => typeof d === 'number');
+  const age = r.registration?.ageDays ?? (fallback.length ? Math.max(...fallback) : undefined);
   if (age === undefined || age === null) setFact('f-age', 'Unknown', 'unknown');
   else setFact('f-age', describeAge(age), age < 30 ? 'bad' : age < 180 ? 'warn' : 'good');
 
