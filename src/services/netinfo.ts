@@ -2,7 +2,7 @@
  * What is actually running at an IP address, from Shodan's InternetDB.
  *
  * Free, keyless, CORS-enabled, and read-only: it returns what Shodan already
- * knows from its own scanning. Pagida never scans anything itself — probing a
+ * knows from its own scanning. Pagida never scans anything itself: probing a
  * third party's infrastructure without authorisation is a criminal offence in
  * Australia and most other places, and a defensive tool has no business doing
  * it. This is a lookup of someone else's public dataset, nothing more.
@@ -58,8 +58,8 @@ export async function lookupHost(ip: string): Promise<HostFacts | undefined> {
 
 /** Ports that have no business being open on something serving a login page. */
 export const ALARMING_PORTS: Record<number, string> = {
-  21: 'FTP — unencrypted file transfer',
-  23: 'Telnet — unencrypted remote login',
+  21: 'FTP: unencrypted file transfer',
+  23: 'Telnet: unencrypted remote login',
   445: 'Windows file sharing, exposed to the internet',
   1433: 'Microsoft SQL Server, exposed to the internet',
   3306: 'MySQL, exposed to the internet',

@@ -1,25 +1,33 @@
 # Privacy Policy
 
-**Pagida — Phishing Detector**
-Last updated: 23 August 2026 (version 2.1.1)
+**Pagida: Phishing Detector**
+Last updated: 12 November 2026 (version 6.0.0)
 
 ## The short version
 
 Pagida has no account, no analytics, no telemetry, no advertising, and sells
 nothing. Scoring happens on your computer.
 
-There is now **one** server involved, and this policy will not bury it: Pagida
-runs a small proxy so that everyone gets the key-gated threat list for free
-without registering for anything. It receives **a domain name** — `example.com`
-— and never the address of the page you are on. It stores nothing. It is a
-single switch on the options page, and turning it off costs you one signal out
-of twenty-two, not the product.
+Since version 5 Pagida works offline first: its checks, both scam lists and
+its logo matching all run on your computer. There is **one** server involved,
+and this policy will not bury it: a small proxy that asks Google's threat list
+about a site. It receives **a domain name** (`example.com`) and never the
+address of the page you are on. It is only asked about sites that are not among
+the world's 10,000 best known, at most once a day per site, and never about
+your own network (routers, `localhost`, `.local`, intranet names). It stores
+nothing about you. Turning it off leaves Pagida fully working, offline.
+
+Since version 6 Pagida also checks the emails you open in Gmail and Outlook
+on the web. **The email itself never leaves your computer**: not its words, not
+its sender, not its links. The text model reads it inside the tab. The only
+things that go online are domain names, in the same two lookups Pagida already
+makes for web pages, and only for emails that are not already called an attack.
 
 Everything below is the long version, source by source.
 
 ## What Pagida stores, and where
 
-Everything is stored in `chrome.storage.local` — on this computer, in this
+Everything is stored in `chrome.storage.local`: on this computer, in this
 browser profile, and nowhere else.
 
 | Stored | What it is |
@@ -28,8 +36,11 @@ browser profile, and nowhere else.
 | Marked sites | Hostnames you explicitly reported as phishing or marked as safe |
 | Install id | A random string this browser generates for itself, used only as a quota counter for the service below. Not an account, not linked to you, never sent anywhere else |
 | Domain-age cache | Registrable domains and their registration age, kept for 7 days |
-| Blocklist | A copy of the public OpenPhish feed, refreshed every 12 hours |
-| Counters | Three numbers: pages checked, warnings raised, sites you reported |
+| Blocklists | A copy of the public OpenPhish feed, refreshed every 12 hours, and a fingerprinted copy of Phishing.Database's active phishing domains (about 3 MB, in IndexedDB), refreshed daily |
+| Lookup memory | For up to 3,000 sites: the fact that Google's list had nothing on them, and when. Kept for 24 hours (1 hour on shared hosts like github.io), so the proxy is not asked again |
+| Counters | Four numbers: pages checked, emails checked, warnings raised, sites you reported |
+| Site memory | For each site you visit, or each document, form or file on a shared platform like Google Docs, Drive or Forms: the first and latest day it was opened, on how many days, and whether Pagida ever warned there. Filed under a keyed hash (HMAC-SHA-256) of the site, never its name. The key is created on this computer and kept by the browser as non-extractable, so the list cannot be turned back into site names. Entries not seen for 180 days are dropped, at most 5,000 are kept. Never sent anywhere. Switch it off, or wipe it together with its key, in Options → *Get to know the sites I use* |
+| Sites you sign in to | For up to 300 sites where you signed in on a page Pagida had already checked and found fine: the site's name (`bendigobank.com.au`) and a 16-character fingerprint of its tab icon. Never the address of the page, your username, your password or when you visit. Used to recognise a different site copying one of yours. Switch it off, or wipe it, in Options → *Remember where I sign in* |
 
 Pagida deliberately does **not** use `chrome.storage.sync`. Sync would push
 browsing-derived data through your Google account, and a tool built to protect
@@ -37,9 +48,36 @@ your browsing should not quietly move it somewhere else.
 
 Uninstalling the extension deletes all of it.
 
+## Email checking (on by default)
+
+Pagida's mail script runs only on `mail.google.com`, `outlook.live.com`,
+`outlook.office.com` and `outlook.office365.com`. When you open an email it
+reads what is on screen: the sender's name and address, your own address, the
+subject, the body text, the links, attachment names, and images the webmail
+has already loaded.
+
+- The trained text model scores the subject and body **inside the tab**. Only
+  its one number is passed on, to Pagida's own service worker on this computer.
+- The worker checks links against the local blocklists and rules, and decodes
+  QR codes from the images. To decode a QR code it fetches the image again,
+  without cookies, and only images the webmail has already shown you. If your
+  webmail is blocking a sender's images, Pagida does not fetch them, so it
+  cannot tell a sender you opened their email.
+- Nothing about an email is stored. Not the email, not the verdict.
+- When you click a link in an email Pagida checked, the worker is told the
+  link and whether the email was a warning, and keeps that for two minutes so
+  the page it opens is judged knowing where it came from. Then it is gone.
+- Online, for an email that is not already called an attack: the registrable
+  domains of the sender and of up to three unknown links go to `rdap.org` for
+  their age (section 2 below), and up to three unknown link hostnames go to the
+  Pagida service (section 1 below). Never a full link, never the sender's
+  address, never anything from the email's text. Well-known sites and brand
+  domains are never looked up.
+- Switch it off: Options → *Check my emails*.
+
 ## What leaves your computer
 
-### 1. The Pagida service — domain only (on by default)
+### 1. The Pagida service: domain only (on by default)
 
 Google publishes a list of sites caught spreading scams and malware. Reading it
 requires a paid API key, which is exactly the kind of obstacle that means a
@@ -50,21 +88,23 @@ What is sent: **the bare domain name and nothing else.** The server rejects any
 request containing a path or a query string, so a bug in the extension cannot
 leak a URL here even by accident.
 
-What is stored on the server: **nothing.** No IP address, no install id, no
-query history, no logs, no analytics. The install id travels in a header purely
-so a single runaway client cannot exhaust the shared daily allowance; it is
-discarded once the counter is incremented, and the counter itself expires daily.
+What is stored on the server: **two counters, and nothing that names you.**
+No IP address, no install id, no query history, no logs, no analytics. To share
+the day's allowance fairly, the server counts lookups per network under a
+one-way hash of the date and the IP address, never the address itself. The
+install id travels in a header for the same reason and is not stored. Both
+counters are deleted two days later.
 
-The proxy source is in the repository at `proxy/worker.js` — you can read
+The proxy source is in the repository at `proxy/worker.js`, so you can read
 exactly what it does.
 
 Why it is on by default: a protection nobody finds in a settings screen protects
 nobody. That is a judgement call, made in the open, and reversible in one click:
 Options → What I look up → *Check against Google's threat list*.
 
-### 2. Domain-age lookups — `rdap.org` and the domain registries (on by default)
+### 2. Domain-age lookups: `rdap.org` and the domain registries (on by default)
 
-Pagida sends **the registrable domain only** — `example.com` — to find out when
+Pagida sends **the registrable domain only** (`example.com`) to find out when
 it was registered. Newly created domains are the single strongest free signal in
 phishing detection. `rdap.org` redirects to the registry that actually holds the
 record, so the request may end at Verisign, Nominet, or another registry.
@@ -74,15 +114,40 @@ record, so the request may end at Verisign, Nominet, or another registry.
 - Requests time out after four seconds and failure is silent.
 - Switch it off: Options → What I look up → *Check how old a domain is*.
 
-### 3. Blocklist download — `raw.githubusercontent.com` (on by default)
+### 3. Blocklist downloads: `raw.githubusercontent.com` (on by default)
 
 Pagida downloads the [OpenPhish community feed](https://github.com/openphish/public_feed)
-every 12 hours. This is a plain file download of a public list. The matching
-then happens entirely on your machine — **the pages you visit are never sent**.
+every 12 hours and the [Phishing.Database](https://github.com/Phishing-Database/Phishing.Database)
+active-domain list (MIT licence, about 3.7 MB) once a day. These are plain file
+downloads of public lists. The matching then happens entirely on your machine:
+**the pages you visit are never sent**.
+
+### 3a. Can this sender's address be faked? `cloudflare-dns.com` (on by default)
+
+When an email claims to come from your own organisation and wants you to
+click or open something, Pagida asks Cloudflare's public DNS for that
+domain's DMARC record: the public note that tells mail servers whether to
+refuse forged mail in the domain's name. Without one, anyone can send mail
+that shows that address.
+
+What is sent: **the domain name only**, for example `yourcompany.com`. Never
+the email, the sender's full address, or yours. The answer is kept for 30
+days. For the brands Pagida knows, the answer is built into the extension, so
+nothing is sent for them.
+
+Switch it off: Options → What I look up → *Whether your work email address can be faked*.
+
+### 3b. Favicon check: the site you are already on
+
+On a site that is not well known and is asking for a password, a card, a code
+or a recovery phrase, Pagida fetches that page's own tab icon once more (with no
+cookies and no referrer) to compare its fingerprint against the icons of
+commonly impersonated brands. The request goes only to the site you are already
+visiting, for a file your browser has already loaded.
 
 Switch it off: Options → What I look up → *The community scam list*.
 
-### 4. The site report — only when you open one
+### 4. The site report: only when you open one
 
 Opening a site report makes further lookups, and only then. Every one of them
 receives a domain name or an IP address. None receives the page you were on.
@@ -100,7 +165,7 @@ All of these run only when you press the button, never in the background, and
 the whole feature can be switched off: Options → What I look up → *Full site
 reports*.
 
-### 5. Your own Safe Browsing key — off by default
+### 5. Your own Safe Browsing key: off by default
 
 This is the only feature that sends the **full address** of pages you open to a
 third party, which is why it is off, and why it requires you to supply your own
@@ -111,7 +176,7 @@ complete URL of each page you visit is sent to Google, subject to
 
 Switch it on: Options → What I look up → *Use my own Safe Browsing key*.
 
-### 6. PhishTank — only when you click
+### 6. PhishTank: only when you click
 
 If you report a site as phishing, Pagida asks whether you also want to submit it
 to PhishTank. Saying yes opens PhishTank in a new tab with the URL filled in.
@@ -121,17 +186,19 @@ Nothing is submitted automatically, and saying no keeps the report local.
 
 Pagida runs a content script on `http` and `https` pages. It reads the page
 structure and sends a **fixed-shape summary** to the extension's own service
-worker — inside your browser, never over the network.
+worker, inside your browser, never over the network.
 
 The summary contains only: whether a password field exists, where login forms
 submit to, how many hidden frames there are, which brand names appear in the
 title or headings, where the tab icon is loaded from, whether paste or
-right-click is blocked, a single obfuscation score, link and form counts, and —
-for the report — the page's declared generator, framework hints, and the list of
+right-click is blocked, a single obfuscation score, link and form counts, and,
+for the report, the page's declared generator, framework hints, and the list of
 third-party hosts it loads scripts from.
 
 It does **not** contain page text, form values, passwords, cookies, session
-tokens, or anything you type.
+tokens, or anything you type. On a page that asks for a password, card or code,
+the trained page model reads the visible text **inside the tab** and passes on
+only its one number, the same way the email model does.
 
 ## Why Pagida asks for access to all sites
 

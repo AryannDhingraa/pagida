@@ -32,7 +32,7 @@ the score in an attacker's favour.
 ## Out of scope
 
 - Phishing pages that Pagida fails to detect. These are gaps in coverage, not
-  vulnerabilities — please open a normal issue with the URL, defanged.
+  vulnerabilities. Please open a normal issue with the URL, defanged.
 - False positives on legitimate sites. Also a normal issue, and very welcome.
 - Findings that require an already-compromised browser profile or physical
   access to an unlocked machine.

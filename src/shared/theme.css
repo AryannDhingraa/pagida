@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
-   Pagida — Aurora
+   Pagida: Aurora
    Shared tokens for the popup, options page, site report and link checker.
 
    Built light on purpose. Pagida is for people who get phished, not for people
@@ -8,7 +8,7 @@
    -------------------------------------------------------------------------- */
 
 :root {
-  /* ground — a hair off pure white, warm-biased so the cool aurora reads against it */
+  /* ground: a hair off pure white, warm-biased so the cool aurora reads against it */
   --paper: #FDFDFC;
   --surface: #FFFFFF;
   --surface-2: #F6F6F3;
@@ -25,12 +25,12 @@
   --brand-2: #9C8FFF;
   --brand-wash: #F3F1FE;
 
-  /* aurora — Iris's body. Not used as interface colour anywhere else. */
+  /* aurora: Iris's body. Not used as interface colour anywhere else. */
   --aur-1: #6FEBDA;
   --aur-2: #7BB4FF;
   --aur-3: #B49BFF;
 
-  /* risk bands — a separate family from the brand, on purpose */
+  /* risk bands: a separate family from the brand, on purpose */
   --safe: #12A672;      --safe-wash: #EBF8F2;    --safe-line: #C9EDDD;
   --notice: #3D7FEA;    --notice-wash: #EDF3FE;  --notice-line: #CFE0FB;
   --caution: #C67C0A;   --caution-wash: #FEF6E7; --caution-line: #F6E3BC;

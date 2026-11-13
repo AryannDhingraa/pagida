@@ -5,7 +5,7 @@
  * that makes a hosting fact meaningful to a non-technical person: not
  * "45.61.x.x" but "a bulk hosting company in Seychelles".
  *
- * Fails soft like everything else — an unknown row is fine, a broken report is not.
+ * Fails soft like everything else: an unknown row is fine, a broken report is not.
  */
 const ENDPOINT = 'https://ipwho.is/';
 const TIMEOUT_MS = 5000;
@@ -16,7 +16,7 @@ export interface IpFacts {
   countryCode?: string;
   region?: string;
   city?: string;
-  /** The network operator — "Cloudflare", "Amazon", "some reseller in Belize". */
+  /** The network operator: "Cloudflare", "Amazon", "some reseller in Belize". */
   asnName?: string;
   asn?: string;
   isp?: string;

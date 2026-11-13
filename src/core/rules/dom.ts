@@ -1,5 +1,5 @@
 /**
- * Tier 2 — page content rules.
+ * Tier 2: page content rules.
  *
  * These only run when a content script has actually looked at the rendered page.
  * They are the strongest evidence the engine has, because they describe what the
@@ -67,7 +67,7 @@ export const brandContentMismatch: Rule = (e) => {
   const tokens = e.dom?.brandTokens ?? [];
   if (tokens.length === 0) return null;
   const { registrableDomain } = parseHost(e.hostname);
-  if (BRAND_DOMAINS.has(registrableDomain)) return null;
+  if (isTrustedName(registrableDomain)) return null;
 
   for (const token of tokens) {
     const legit = domainsForToken(token);
@@ -77,7 +77,7 @@ export const brandContentMismatch: Rule = (e) => {
       title: `Page presents itself as ${token}`,
       detail: `This page uses ${token} branding, but it is hosted on ${registrableDomain}. ${token} pages are served from ${legit.slice(0, 2).join(' or ')}.`,
       tier: 'dom',
-      weight: e.dom?.hasPasswordField ? 24 : 16,
+      weight: e.dom?.hasPasswordField && e.dom.passwordFieldVisible !== false ? 24 : 16,
     });
   }
   return null;
@@ -87,7 +87,7 @@ export const brandContentMismatch: Rule = (e) => {
  * A favicon hotlinked from a brand the page does not belong to.
  *
  * The first version of this fired on *any* cross-domain favicon, which is how
- * essentially every large site serves one — Google loads its icon from gstatic,
+ * essentially every large site serves one: Google loads its icon from gstatic,
  * and the rule flagged Google. It now only fires on the actual attack: a site
  * that is not itself well known, serving a brand's own icon from the brand's
  * own domain, which is what happens when someone copies a login page wholesale.
@@ -129,9 +129,11 @@ export const antiAnalysisBehaviour: Rule = (e) => {
   });
 };
 
-/** Hidden iframes — overlay and clickjacking technique. */
+/** Hidden iframes: overlay and clickjacking technique. */
 export const hiddenIframes: Rule = (e) => {
   if (isTrustedName(parseHost(e.hostname).registrableDomain)) return null;
+  // Only interesting next to a sign-in form; on its own it is ad tech.
+  if (!e.dom?.hasPasswordField) return null;
   const n = e.dom?.hiddenIframeCount ?? 0;
   if (n < 1) return null;
   return sig({
@@ -159,10 +161,11 @@ export const obfuscatedScripts: Rule = (e) => {
   });
 };
 
-/** A login page whose navigation goes nowhere — a single-page kit. */
+/** A login page whose navigation goes nowhere: a single-page kit. */
 export const deadNavigation: Rule = (e) => {
   const d = e.dom;
-  if (!d?.hasPasswordField) return null;
+  if (!d?.hasPasswordField || d.passwordFieldVisible === false) return null;
+  if (isTrustedName(parseHost(e.hostname).registrableDomain)) return null;
   if (d.linkCount < 5) return null;
   if (d.deadLinkRatio < 0.8) return null;
   return sig({

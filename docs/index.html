@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Pagida — a phishing detector that shows its working</title>
+<title>Pagida: a phishing detector that shows its working</title>
 <meta name="description" content="Open-source Chrome extension that scores every page for phishing risk against 37 rules and tells you exactly which warning signs it found. Runs locally, sends nothing.">
 <link rel="icon" href="img/icon.png">
-<meta property="og:title" content="Pagida — a phishing detector that shows its working">
+<meta property="og:title" content="Pagida: a phishing detector that shows its working">
 <meta property="og:description" content="Every page gets a risk score out of 100, and every point traces back to a named warning sign you can read for yourself.">
 <meta property="og:image" content="img/popup-danger.png">
 <style>
@@ -86,7 +86,7 @@ footer a:hover{color:var(--fg)}
 <header>
   <img src="img/icon.png" alt="">
   <h1>PAGIDA</h1>
-  <p class="greek">παγίδα — Greek for "trap"</p>
+  <p class="greek">παγίδα: Greek for "trap"</p>
   <p class="tagline">A phishing detector for Chrome that shows its working. Every page gets a risk score out of 100, and every point of that score traces back to a warning sign you can read for yourself.</p>
   <div class="cta">
     <a class="primary" href="https://github.com/AryannDhingraa/pagida#install">Install from source</a>
@@ -115,7 +115,7 @@ footer a:hover{color:var(--fg)}
   <p class="lede">The repository ships an evaluation harness you can run yourself. It scores today's confirmed-phishing feed against 2,000 legitimate sites and 40 real brand login pages, using the same engine the extension runs.</p>
   <div class="grid">
     <div class="card"><span class="n">97.8%</span><h3>PRECISION</h3><p>At the band where Pagida escalates its badge. Two false positives across 2,040 legitimate URLs.</p></div>
-    <div class="card"><span class="n">62.7%</span><h3>RECALL</h3><p>At the flagging band, from the address alone — no page content, no blocklist.</p></div>
+    <div class="card"><span class="n">62.7%</span><h3>RECALL</h3><p>At the flagging band, from the address alone, with no page content and no blocklist.</p></div>
     <div class="card"><span class="n">0</span><h3>FALSE POSITIVES</h3><p>Across 40 real brand login URLs: PayPal, myGov, CommBank, Microsoft, AWS.</p></div>
   </div>
   <div class="tw">
@@ -128,14 +128,14 @@ footer a:hover{color:var(--fg)}
     </tbody>
   </table>
   </div>
-  <p>Only the top band interrupts you, and it is set where address heuristics alone effectively cannot reach it — a warning that fires on one site in forty is a warning people learn to click through.</p>
+  <p>Only the top band interrupts you, and it is set where address heuristics alone effectively cannot reach it. A warning that fires on one site in forty is a warning people learn to click through.</p>
 </section>
 
 <section>
   <h2>Nothing leaves your machine by default</h2>
   <p class="lede">Two optional lookups, both switchable off, neither carrying a page you visited.</p>
   <ul>
-    <li><b>rdap.org</b> receives the domain name only — <code>example.com</code>, never the path or query string — to find out how old it is. Cached for a week.</li>
+    <li><b>rdap.org</b> receives the domain name only (<code>example.com</code>, never the path or query string) to find out how old it is. Cached for a week.</li>
     <li><b>raw.githubusercontent.com</b> serves the OpenPhish public blocklist once every 12 hours. Matching then happens on your machine.</li>
     <li><b>Google Safe Browsing</b> is off by default, because it is the one lookup that would send full addresses to a third party. If you want it, you supply your own key.</li>
   </ul>

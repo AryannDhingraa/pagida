@@ -1,5 +1,5 @@
 /**
- * Tier 3 — reputation rules.
+ * Tier 3: reputation rules.
  *
  * Two different kinds of thing live in here and the difference matters. Domain
  * age is an inference: young domains correlate with phishing, and plenty of
@@ -13,6 +13,9 @@
  * working with no keys, no network, and no consent to look anything up.
  */
 import type { Rule, Signal } from '../types.js';
+import { asksForSecret } from '../identity.js';
+import { parseHost } from '../util/domain.js';
+import { freeHostOf } from '../util/entropy.js';
 
 const sig = (s: Signal): Signal => s;
 
@@ -24,6 +27,11 @@ export const newlyRegisteredDomain: Rule = (e) => {
   const age = e.domainAgeDays;
   if (age === undefined || age === null) return null;
   if (age > 90) return null;
+  // A 1-3 month old domain matters most when it is asking for something, so a
+  // quiet page gets half the weight there. Under a month keeps full weight:
+  // phishing landing pages often ask for nothing on the first screen.
+  const quiet = e.dom !== undefined && !asksForSecret(e) && (e.dom.brandTokens?.length ?? 0) === 0;
+  const scale = (w: number) => (quiet ? Math.round(w / 2) : w);
 
   if (age <= 7) {
     return sig({
@@ -48,15 +56,18 @@ export const newlyRegisteredDomain: Rule = (e) => {
     title: `Domain registered ${age} days ago`,
     detail: 'This domain is fairly new. Not unusual on its own, but worth knowing.',
     tier: 'reputation',
-    weight: 12,
+    weight: scale(12),
   });
 };
 
-/** Established domains earn a small credit — this is the one negative weight. */
+/** Established domains earn a small credit: this is the one negative weight. */
 export const establishedDomain: Rule = (e) => {
   const age = e.domainAgeDays;
   if (age === undefined || age === null) return null;
   if (age < 730) return null;
+  // On a free host the age is the platform's, not the page owner's.
+  const { suffix, registrableDomain } = parseHost(e.hostname);
+  if (freeHostOf(e.hostname, suffix, registrableDomain)) return null;
   return sig({
     id: 'domain_well_established',
     title: `Domain has existed for ${Math.floor(age / 365)} years`,
@@ -81,7 +92,7 @@ export const feedUrlMatch: Rule = (e) => {
   });
 };
 
-/** Hostname match — broader, so weighted lower than an exact URL match. */
+/** Hostname match: broader, so weighted lower than an exact URL match. */
 export const feedHostMatch: Rule = (e) => {
   if (!e.feedHostHit || e.feedUrlHit) return null;
   return sig({
@@ -116,8 +127,8 @@ export const safeBrowsingMatch: Rule = (e) => {
  *
  * Weighted just under Safe Browsing's own rule for the plain reason that this
  * lookup is domain-level: Web Risk was asked about the site, not the exact
- * page. That is still a very strong signal — Google does not list a domain on
- * a hunch — but a compromised subpage of a large host is the case where a
+ * page. That is still a very strong signal: Google does not list a domain on
+ * a hunch, but a compromised subpage of a large host is the case where a
  * URL-level answer would be sharper.
  */
 export const webRiskMatch: Rule = (e) => {
@@ -142,7 +153,25 @@ const THREAT_WORDS: Record<string, string> = {
   UNWANTED_SOFTWARE: 'a site that pushes unwanted software',
 };
 
+/**
+ * The big local list. Community-maintained and not perfect (it once listed
+ * Netflix's video servers), so it is `correlated`, not `confirmed`: strong,
+ * but a person's own "this is safe" can still overrule it.
+ */
+export const blocklistMatch: Rule = (e) => {
+  if (!e.blocklistHit || e.feedUrlHit || e.feedHostHit) return null;
+  return sig({
+    id: 'local_blocklist_match',
+    title: 'On a public list of phishing sites',
+    detail: 'This domain is on Phishing.Database, a public list of active phishing sites that Pagida keeps on your computer and checks without sending anything anywhere.',
+    tier: 'reputation',
+    weight: 50,
+    certainty: 'correlated',
+  });
+};
+
 export const REPUTATION_RULES: Rule[] = [
+  blocklistMatch,
   newlyRegisteredDomain,
   establishedDomain,
   feedUrlMatch,

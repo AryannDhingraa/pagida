@@ -21,14 +21,19 @@
  */
 import type { Band, Confidence, Conclusion, PageEvidence, Rule, Signal, Verdict } from './types.js';
 import { ALL_RULES } from './rules/index.js';
-import { concludeFrom, floorFrom, higherBand } from './conclusions.js';
+import { concludeFrom, floorFrom, higherBand, bandRank } from './conclusions.js';
+import { isPrivateHost } from './util/network.js';
+import { parseHost } from './util/domain.js';
+import { BRAND_DOMAINS, isOfficialDomain, isWellKnown } from './data/index.js';
+
+export { BAND_ADVICE, BAND_HEADLINE, BAND_NAME, CONFIDENCE_NOTE, adviceFor, headlineFor } from './wording.js';
 
 /**
  * Band boundaries, chosen from the evaluation curve rather than from round
  * numbers. See EVALUATION.md: on address evidence alone the engine separates
  * confirmed phishing from legitimate sites cleanly around 15-35, and the top
  * band is set high enough that it is effectively unreachable without either
- * page-content evidence or a blocklist match — which is deliberate, because the
+ * page-content evidence or a blocklist match, which is deliberate, because the
  * top band is the only one that interrupts the user.
  */
 export const BAND_THRESHOLDS = {
@@ -95,6 +100,24 @@ export function evaluate(e: PageEvidence, opts: EvaluateOptions = {}): Verdict {
     };
   }
 
+  // --- the user's own network ---
+  if (isPrivateHost(e.hostname)) {
+    return {
+      ...base,
+      score: 0,
+      band: 'clean',
+      conclusions: [],
+      confidence: 'medium',
+      signals: [{
+        id: 'private_network_host',
+        title: 'This is on your own network or computer',
+        detail: `${e.hostname} is a local address, like a router, a home server or a development site. Scams reach people from the public internet, so Pagida does not score these and never looks them up anywhere.`,
+        tier: 'url',
+        weight: 0,
+      }],
+    };
+  }
+
   // --- run every rule ---
   const signals: Signal[] = [];
   for (const rule of rules) {
@@ -148,7 +171,7 @@ export function evaluate(e: PageEvidence, opts: EvaluateOptions = {}): Verdict {
         {
           id: 'trust_overruled',
           title: 'You marked this site safe, and I am warning you anyway',
-          detail: 'You trusted this site before, so Pagida has been staying quiet about it. It is now on a list of confirmed attacks — which usually means it has been compromised since. This is the one thing your mark does not silence.',
+          detail: 'You trusted this site before, so Pagida has been staying quiet about it. It is now on a list of confirmed attacks, which usually means it has been compromised since. This is the one thing your mark does not silence.',
           tier: 'user',
           weight: 0,
         },
@@ -159,7 +182,7 @@ export function evaluate(e: PageEvidence, opts: EvaluateOptions = {}): Verdict {
   // --- normal path: the sum proposes, the conclusions dispose ---
   const raw = signals.reduce((sum, s) => sum + s.weight, 0);
   const score = Math.max(0, Math.min(100, raw));
-  const band = higherBand(bandFor(score), floorFrom(conclusions));
+  const band = higherBand(capHeuristics(bandFor(score), e, signals, conclusions), floorFrom(conclusions));
 
   return {
     ...base,
@@ -169,6 +192,37 @@ export function evaluate(e: PageEvidence, opts: EvaluateOptions = {}): Verdict {
     confidence: confidenceFrom(signals, conclusions, band),
     signals,
   };
+}
+
+/**
+ * A pile of cosmetic observations is not a verdict.
+ *
+ * v3 let the sum alone reach `danger`, the band that says "do not type your
+ * password here". Without a conclusion or a confirmed match, heuristics now
+ * stop at `suspicious`, and on a domain that has existed for two years they
+ * stop at `caution`: an old domain with an odd-looking address is a quirk,
+ * not an attack, until the page itself does something an attack does.
+ */
+const ADDRESS_IMPERSONATION = new Set([
+  'brand_in_subdomain', 'brand_in_domain_name', 'brand_typosquat', 'brand_confusable_domain', 'brand_on_foreign_tld', 'mixed_script_hostname',
+]);
+
+export function capHeuristics(band: Band, e: PageEvidence, signals: Signal[], conclusions: Conclusion[]): Band {
+  if (conclusions.length > 0) return band;
+  if (signals.some((s) => s.certainty === 'confirmed' && s.weight > 0)) return band;
+  // The address itself impersonating a brand is not cosmetic: that is the
+  // attack, written where everyone can read it.
+  if (signals.some((s) => ADDRESS_IMPERSONATION.has(s.id))) return band;
+  // Old domains are softened, except where the address shows the site has
+  // been broken into: phishing kits live on old, hacked WordPress sites.
+  const compromised = signals.some((s) => s.id === 'wordpress_internal_path' || s.id === 'wordpress_upload_path');
+  // Top sites, brands' own domains and official domains (gov.in, gov.au) are
+  // never judged by guesswork alone, however new the page or the domain.
+  const here = parseHost(e.hostname).registrableDomain;
+  // A site this person has used on many days, with no warning ever, counts as known to them.
+  const known = isWellKnown(here) || BRAND_DOMAINS.has(here) || isOfficialDomain(here) || !!e.history?.trusted;
+  const ceiling: Band = ((e.domainAgeDays ?? 0) >= 730 || known) && !compromised ? 'caution' : 'suspicious';
+  return bandRank(band) > bandRank(ceiling) ? ceiling : band;
 }
 
 /**
@@ -207,76 +261,3 @@ export function summarise(v: Verdict): string {
   return `${n} warning sign${n === 1 ? '' : 's'} found on this page.`;
 }
 
-// ---------------------------------------------------------------------------
-// Plain English.
-//
-// The score is for people who want it. The sentence is for everyone else, and
-// it is the only thing most people will ever read, so it says what to do rather
-// than what was found.
-// ---------------------------------------------------------------------------
-
-export const BAND_HEADLINE: Record<Band, string> = {
-  clean: 'This page looks fine.',
-  caution: 'A couple of things worth knowing.',
-  suspicious: 'Be careful with this one.',
-  danger: 'Do not type your password here.',
-};
-
-export const BAND_ADVICE: Record<Band, string> = {
-  clean: 'Nothing here looks like a scam.',
-  caution: 'Nothing alarming, but have a look at what I found before signing in.',
-  suspicious: 'Several things do not add up. Do not enter a password or card number.',
-  danger: 'This page is almost certainly pretending to be someone else. Close it.',
-};
-
-/** Short label for the toolbar tooltip and the report header. */
-export const BAND_NAME: Record<Band, string> = {
-  clean: 'Nothing found',
-  caution: 'Worth a look',
-  suspicious: 'Suspicious',
-  danger: 'Likely phishing',
-};
-
-/**
- * The headline Iris says. Overrides get their own wording, because "you told me
- * to trust this" is a different statement from "I checked and it is fine".
- */
-export function headlineFor(verdict: Verdict): string {
-  if (verdict.override === 'overruled') return 'I have to break my own rule here.';
-  // A conclusion is a better headline than a band label, because it says what
-  // is actually happening rather than how worried to be about it.
-  if (verdict.conclusions[0]) return verdict.conclusions[0].title;
-  if (verdict.override === 'trusted') return 'You told me this one is fine.';
-  if (verdict.override === 'reported') return 'You reported this site.';
-  if (verdict.band === 'clean' && verdict.urlOnly) return 'Nothing odd about this address.';
-  return BAND_HEADLINE[verdict.band];
-}
-
-export function adviceFor(verdict: Verdict): string {
-  if (verdict.override === 'overruled') {
-    return 'You marked this site safe, so I stay quiet about anything I only suspect. This is not that — it is on a confirmed list of attacks, which usually means it has been broken into since you trusted it.';
-  }
-  if (verdict.conclusions[0]) return verdict.conclusions[0].detail;
-  if (verdict.override === 'trusted') return 'I am not applying guesswork here. I will still warn you if it turns up on a confirmed threat list.';
-  if (verdict.override === 'reported') return 'I will keep warning you about it until you undo that.';
-  if (verdict.band === 'clean' && verdict.urlOnly) {
-    return 'I could not read the page itself — reload it for the full check.';
-  }
-  return BAND_ADVICE[verdict.band];
-}
-
-/**
- * What the score is actually worth, in one line, under the number.
- *
- * The criticism this answers: a weighted sum presented beside "do not type your
- * password here" reads as a probability, and it is not one. 55 does not mean
- * "55% likely" — it means some rules fired and their weights added up. These
- * lines say where the answer came from, so the user can tell the difference
- * between six cosmetic observations and one positive identification.
- */
-export const CONFIDENCE_NOTE: Record<Confidence, string> = {
-  confirmed: 'Confirmed by a threat-intelligence source — not a guess.',
-  high: 'Strong evidence: several independent things line up the way an attack does.',
-  medium: 'Moderate evidence. Worth a look rather than an alarm.',
-  low: 'Weak evidence — surface details only. Plenty of honest sites look like this.',
-};

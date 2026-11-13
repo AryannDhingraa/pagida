@@ -1,10 +1,13 @@
+import type { Band } from '../core/types.js';
 /**
  * The typed message protocol between content script, service worker and UI.
  * Keeping it in one file means a rename breaks the build rather than breaking
  * silently at runtime, which is the usual failure mode in extensions.
  */
+import type { ReaderState } from '../email/health.js';
 import type { DomEvidence, Verdict } from '../core/types.js';
 import type { SiteReport, TechFacts } from '../services/report.js';
+import type { EmailEvidence } from '../email/types.js';
 
 export type Message =
   /** Content script -> worker: here is what the page looks like. */
@@ -30,7 +33,20 @@ export type Message =
   | { type: 'SHOW_COMPANION'; verdict: Verdict }
   | { type: 'HIDE_COMPANION' }
   /** Popup -> content script: report your signals again, right now. */
-  | { type: 'RESCAN' };
+  | { type: 'RESCAN' }
+  /** Webmail content script -> worker: check this open email. */
+  | { type: 'EMAIL_SIGNALS'; email: EmailEvidence; imageUrls: string[] }
+  /** Popup -> worker: how is email checking going on this webmail tab? */
+  | { type: 'MAIL_HEALTH'; state: ReaderState; client: 'gmail' | 'outlook' }
+  | { type: 'GET_MAIL_STATUS'; tabId: number }
+  /** Page content script -> worker: the person just signed in on this page. */
+  | { type: 'SIGNED_IN'; url: string; faviconUrl?: string }
+  /** Options -> worker: wipe the sign-in memory. */
+  | { type: 'FORGET_SIGN_INS' }
+  /** Webmail content script -> worker: the person clicked a link in an email Pagida checked. */
+  | { type: 'EMAIL_LINK_OPENED'; href: string; band: Band; warned: boolean }
+  /** Options -> worker: wipe the site memory and its key. */
+  | { type: 'FORGET_HISTORY' };
 
 export type Response =
   | { ok: true; verdict: Verdict }

@@ -6,7 +6,7 @@
  * endpoint covers everything, with no API key and no account.
  *
  * Privacy note that belongs in the README as much as in the code: this sends
- * the *registrable domain only* — `example.com`, never the full URL, never the
+ * the *registrable domain only*, `example.com`, never the full URL, never the
  * path, never the query string. Results are cached for a week because a
  * domain's registration date does not change.
  */
@@ -32,7 +32,7 @@ async function writeCache(domain: string, ageDays: number | null): Promise<void>
   const cache = rdapCache ?? {};
   cache[domain] = { ageDays, at: Date.now() };
 
-  // Keep the cache from growing without bound — 2,000 domains is plenty and
+  // Keep the cache from growing without bound: 2,000 domains is plenty and
   // stays well inside the extension storage quota.
   const keys = Object.keys(cache);
   if (keys.length > 2000) {
@@ -45,7 +45,7 @@ async function writeCache(domain: string, ageDays: number | null): Promise<void>
 /**
  * Age of the registrable domain in days.
  * Returns `null` when RDAP has no registration date (some ccTLDs don't publish
- * one), and `undefined` when the lookup failed — the caller treats those
+ * one), and `undefined` when the lookup failed: the caller treats those
  * differently: null means "we asked, there's no answer", undefined means
  * "we don't know", and neither ever produces a signal.
  */

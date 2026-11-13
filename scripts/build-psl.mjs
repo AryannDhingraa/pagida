@@ -13,7 +13,7 @@
  * wrong domain.
  *
  * So the real list ships. ~9,800 rules, ~130KB of text, which gzips to about
- * 35KB inside the package — a rounding error next to being right.
+ * 35KB inside the package, a rounding error next to being right.
  *
  * The data comes from the `psl` devDependency rather than a network fetch, so
  * the build is reproducible offline and updating the list is `npm update psl`
@@ -53,7 +53,7 @@ const output = `/* eslint-disable */
 /**
  * The Public Suffix List, compiled.
  *
- * GENERATED FILE — do not edit by hand.
+ * GENERATED FILE. Do not edit by hand.
  * Run \`npm run build:psl\` to regenerate from the \`psl\` devDependency.
  *
  * Stored as newline-joined strings rather than arrays because the parser is

@@ -70,3 +70,9 @@ select, input[type="password"] { min-width: 210px; }
 .foot { display: flex; gap: 22px; padding: 22px 0 0; font-size: 13px; flex-wrap: wrap; }
 .foot a { color: var(--ink-3); }
 .foot a:hover { color: var(--ink); }
+
+/* A text-style button inside a setting's explanation. */
+button.link { background: none; border: 0; padding: 0; font: inherit; color: var(--brand); text-decoration: underline; cursor: pointer; }
+
+/* A setting the organisation has locked through Chrome policy. */
+.locked { display: block; margin-top: 4px; color: var(--ink-3); font-size: 12px; }

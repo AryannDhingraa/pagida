@@ -3,15 +3,15 @@
  *
  * She lives in a closed shadow root attached to the document element, so the
  * page cannot restyle her, cannot read her, and cannot reach into her with a
- * querySelector. A determined page can still remove the host node — which is
+ * querySelector. A determined page can still remove the host node, which is
  * why the toolbar badge, not this, is the authoritative indicator.
  *
  * She is draggable and remembers where she was put, because a fixed bubble in
  * the corner is the thing that covers the one control you needed.
  */
-import type { Verdict } from '../core/types.js';
-import { adviceFor, headlineFor } from '../core/score.js';
-import { Iris, expressionForBand, injectIrisCss, IRIS_CSS } from '../ui/iris.js';
+import type { Verdict } from '../../core/types.js';
+import { adviceFor, headlineFor } from '../../core/wording.js';
+import { Iris, expressionForBand, injectIrisCss, IRIS_CSS } from '../../ui/iris.js';
 
 const HOST_ID = 'pagida-companion-host';
 const POSITION_KEY = 'pagida:companion-position';

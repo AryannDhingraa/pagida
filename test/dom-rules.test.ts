@@ -94,8 +94,9 @@ describe('DOM tier', () => {
   });
 
   it('flags hidden iframes and scales with the count', () => {
-    const one = evaluate(page('https://x-portal.com/', { hiddenIframeCount: 1 })).score;
-    const three = evaluate(page('https://x-portal.com/', { hiddenIframeCount: 3 })).score;
+    // v4: hidden frames only count next to a sign-in form.
+    const one = evaluate(page('https://x-portal.com/', { hiddenIframeCount: 1, hasPasswordField: true })).score;
+    const three = evaluate(page('https://x-portal.com/', { hiddenIframeCount: 3, hasPasswordField: true })).score;
     expect(three).toBeGreaterThan(one);
   });
 
@@ -199,7 +200,7 @@ describe('user overrides', () => {
   });
 });
 
-describe('conclusions — reaching danger by shape rather than by sum', () => {
+describe('conclusions: reaching danger by shape rather than by sum', () => {
   it('calls a fake brand sign-in page what it is, without needing 55 points', () => {
     const v = evaluate(page('https://account-services.com/signin',
       { hasPasswordField: true, brandTokens: ['paypal'], crossOriginPasswordForm: true }));

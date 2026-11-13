@@ -3,7 +3,7 @@
  *
  * Used to catch typosquats: `paypa1.com` is one substitution away from
  * `paypal.com`, `gogole.com` is one transposition away from `google.com`.
- * The transposition case is why we use Damerau rather than plain Levenshtein —
+ * The transposition case is why we use Damerau rather than plain Levenshtein:
  * swapped adjacent letters are one of the most common typosquat forms.
  */
 export function editDistance(a: string, b: string, max = Infinity): number {

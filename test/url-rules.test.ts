@@ -3,7 +3,7 @@ import { evidenceFromUrl } from '../src/core/evidence.js';
 import { evaluate } from '../src/core/score.js';
 import { URL_RULES } from '../src/core/rules/url.js';
 
-/** Score a URL using only the URL tier — no page content, no network. */
+/** Score a URL using only the URL tier: no page content, no network. */
 function scoreUrl(url: string) {
   const e = evidenceFromUrl(url);
   if (!e) throw new Error(`not analysable: ${url}`);
@@ -12,7 +12,7 @@ function scoreUrl(url: string) {
 
 const firedIds = (url: string) => scoreUrl(url).signals.map((s) => s.id);
 
-describe('URL tier — legitimate sites stay clean', () => {
+describe('URL tier: legitimate sites stay clean', () => {
   const legit = [
     'https://www.google.com/search?q=test',
     'https://github.com/AryannDhingraa',
@@ -31,7 +31,7 @@ describe('URL tier — legitimate sites stay clean', () => {
   }
 });
 
-describe('URL tier — phishing shapes are caught', () => {
+describe('URL tier: phishing shapes are caught', () => {
   it('flags a raw IP host', () => {
     expect(firedIds('http://185.220.101.42/login')).toContain('host_is_ip_literal');
   });
@@ -137,5 +137,14 @@ describe('brand name on a foreign TLD', () => {
   it('does not flag a legitimate regional variant listed for the brand', () => {
     expect(firedIds('https://www.ebay.com.au/')).not.toContain('brand_on_foreign_tld');
     expect(firedIds('https://www.apple.com.au/')).not.toContain('brand_on_foreign_tld');
+  });
+});
+
+describe('malformed addresses', () => {
+  it('a stray percent sign does not throw', async () => {
+    const { evidenceFromUrl } = await import('../src/core/evidence.js');
+    const { evaluate } = await import('../src/core/score.js');
+    const ev = evidenceFromUrl('https://shop.example.com/sale?off=50%&ref=a%ZZ');
+    expect(() => evaluate(ev!)).not.toThrow();
   });
 });

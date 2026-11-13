@@ -1,5 +1,5 @@
 /**
- * abuse.ch URLhaus — a public database of URLs used to distribute malware.
+ * abuse.ch URLhaus: a public database of URLs used to distribute malware.
  *
  * Complements the phishing feed rather than duplicating it: OpenPhish covers
  * credential theft, URLhaus covers payload delivery. A site on either is one

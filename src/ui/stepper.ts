@@ -1,9 +1,9 @@
 /**
  * A vanilla port of the AnimatedStepper.
  *
- * Same behaviour as the React original — slide-and-fade between steps, a
+ * Same behaviour as the React original: slide-and-fade between steps, a
  * container that animates to the height of its content, clickable indicators
- * with completion states — without adding React and framer-motion to an
+ * with completion states, without adding React and framer-motion to an
  * extension that currently ships zero runtime dependencies. For a tool people
  * are asked to trust with every page they open, an auditable bundle is worth
  * more than the convenience of the original component.
@@ -128,7 +128,7 @@ export class Stepper {
   }
 
   /** Slides the new panel in and the old one out, then animates the container
-   *  to the new height — the job framer-motion's animate={{height}} was doing. */
+   *  to the new height, the job framer-motion's animate={{height}} was doing. */
   private paint(direction: number): void {
     const step = this.opts.steps[this.current - 1];
     if (!step) return;

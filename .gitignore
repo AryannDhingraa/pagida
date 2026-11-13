@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist-firefox/
 *.zip
 .DS_Store
 .env
@@ -15,3 +16,8 @@ notes/
 evidence/
 samples/private/
 docs/store/
+__pycache__/
+tools/harness/mail-pages/*.pem
+
+# vitest leaves these behind when a run is interrupted
+vitest.config.ts.timestamp-*.mjs

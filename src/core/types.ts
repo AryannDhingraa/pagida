@@ -8,6 +8,8 @@
  */
 
 /** Which layer of analysis produced a signal. */
+import type { Familiarity } from './history.js';
+
 export type Tier = 'url' | 'dom' | 'reputation' | 'user';
 
 /**
@@ -78,6 +80,8 @@ export interface PageEvidence {
   feedUrlHit?: boolean;
   /** Hostname present in a phishing feed (broader, slightly noisier). */
   feedHostHit?: boolean;
+  /** Domain is on the big local blocklist (Phishing.Database), after filtering. */
+  blocklistHit?: boolean;
   /** Google Safe Browsing returned a threat match. */
   safeBrowsingHit?: boolean;
   /** Google Web Risk, reached through the Pagida service. */
@@ -90,12 +94,18 @@ export interface PageEvidence {
   userReported?: boolean;
   /** The user explicitly marked this host as safe. */
   userTrusted?: boolean;
+  /** This person's own history with this site or item (set by the worker, from local memory). */
+  history?: Familiarity;
+  /** How this page was reached, when Pagida saw the click (a link in an email it checked). */
+  arrival?: { fromEmail: true; emailBand: Band; emailWarned: boolean };
 }
 
 /** Signals extracted from the live page by the content script. */
 export interface DomEvidence {
   title: string;
   hasPasswordField: boolean;
+  /** The sign-in form is on screen: a visible password box, or a visible email/username box beside a not-yet-shown password box (two-step sign-in). False for a login modal that is closed. Undefined on old evidence. */
+  passwordFieldVisible?: boolean;
   /** Absolute URLs that forms containing a password field submit to. */
   passwordFormActions: string[];
   /** True when a password form posts to a different registrable domain. */
@@ -120,6 +130,49 @@ export interface DomEvidence {
   linkCount: number;
   /** Proportion of anchors that are dead (`#`, `javascript:void(0)` or empty). */
   deadLinkRatio: number;
+
+  // --- v5 offline engine (all optional: older evidence simply lacks them) ---
+  /** Brands whose own sign-in page structure is on this page (field ids kits copy). */
+  loginFingerprints?: string[];
+  /** Brands whose own servers supply this page's styles, scripts or images. */
+  brandAssets?: string[];
+  /** Brands whose logo or favicon this page shows, by image fingerprint (set by the worker). */
+  logoBrands?: string[];
+  /** Absolute URL of the favicon, so the worker can fingerprint it. */
+  faviconUrl?: string;
+  /** A visible field labelled as a password that is not a password box (how online-form phishing asks). */
+  formAsksPassword?: boolean;
+  /** A visible field asking for an email address or username. */
+  formAsksEmail?: boolean;
+  /**
+   * A site the person really signs in to whose tab icon this page wears, on a
+   * different site (set by the worker from the local sign-in memory).
+   */
+  copiesSignInSite?: string;
+  /** What the page asks for on screen, beyond a password. */
+  asksCard?: boolean;
+  asksOneTimeCode?: boolean;
+  asksSeedPhrase?: boolean;
+  /** Where form data or script calls go, when that is a known exfiltration service. */
+  exfilTarget?: string;
+  /** A Telegram bot or Discord webhook address is in the page's own code. */
+  botExfil?: boolean;
+  /** A command the page put on the clipboard, cleaned and cut to 300 characters. */
+  clipboardCommand?: string;
+  /** ClickFix: a command on the clipboard plus instructions to run it. */
+  clickFix?: boolean;
+  /** Visible text tells the person to open Run or Terminal and paste. */
+  runInstructions?: boolean;
+  /** Fake virus warning with a phone number. */
+  techSupportScam?: boolean;
+  /** "View this secure document" / "update Adobe to read this". */
+  documentLure?: boolean;
+  /** Crypto giveaway or airdrop text. */
+  cryptoLure?: boolean;
+  /** A brand sign-in address drawn as text in a fake window (browser-in-the-browser). */
+  fakeAddressBar?: string;
+  /** v6: the trained page-text model's probability of phishing, computed in the page. */
+  textModelScore?: number | null;
 }
 
 /**
@@ -169,7 +222,7 @@ export interface Verdict {
    * Set when a user override changed the outcome.
    *  - `trusted`   the user's mark stood, and heuristics were suppressed
    *  - `overruled` the user marked it safe, but confirmed intelligence says
-   *                otherwise and wins — see the note in score.ts
+   *                otherwise and wins, see the note in score.ts
    *  - `reported`  the user reported it themselves
    */
   override?: 'reported' | 'trusted' | 'overruled';

@@ -3,7 +3,7 @@
  *
  * Off by default and requires the user to paste their own API key, for two
  * reasons. First, a shipped key in an extension package is a key that is
- * public. Second, this sends the full URL to Google — which is a reasonable
+ * public. Second, this sends the full URL to Google, which is a reasonable
  * trade for some people and not for others, so it is theirs to make, not ours.
  *
  * Terms note: the Safe Browsing API is free but non-commercial only. Pagida is

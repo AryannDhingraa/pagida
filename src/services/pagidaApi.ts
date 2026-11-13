@@ -1,5 +1,5 @@
 /**
- * The Pagida service — the paid-for lookups, given away.
+ * The Pagida service: the paid-for lookups, given away.
  *
  * Some of the best signals in phishing detection sit behind an API key. Asking
  * every user to go and register for one is the same as not having the feature:
@@ -13,7 +13,7 @@
  *
  * WHAT LEAVES THE MACHINE
  *
- * A bare domain name — never the full address, never the page, never a
+ * A bare domain name, never the full address, never the page, never a
  * referrer. "example.com", not "example.com/account/reset?token=…". The proxy
  * refuses anything containing a path, so a bug here cannot leak a URL even by
  * accident.
@@ -79,7 +79,7 @@ export async function lookupReputation(hostname: string): Promise<ReputationFact
       headers: { 'X-Pagida-Install': await installId() },
     });
     // 429 means the shared quota is spent for today. That is not an error the
-    // user should ever see — the other sixteen signals carry on without it.
+    // user should ever see: the other sixteen signals carry on without it.
     if (!res.ok) return undefined;
 
     const data = (await res.json()) as { listed?: boolean; threatTypes?: string[]; error?: string };

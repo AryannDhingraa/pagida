@@ -2,7 +2,7 @@
 /**
  * The Public Suffix List, compiled.
  *
- * GENERATED FILE — do not edit by hand.
+ * GENERATED FILE. Do not edit by hand.
  * Run `npm run build:psl` to regenerate from the `psl` devDependency.
  *
  * Stored as newline-joined strings rather than arrays because the parser is

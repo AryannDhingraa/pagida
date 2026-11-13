@@ -1,6 +1,6 @@
 # Contributing
 
-Contributions are very welcome, particularly **false-positive reports** — a
+Contributions are very welcome, particularly **false-positive reports**. A
 legitimate site that Pagida flags is more useful to me than almost any feature.
 
 ## Reporting a missed phishing page or a false positive
@@ -11,7 +11,7 @@ Open an issue with:
 - The score and the list of signals Pagida showed, straight from the popup
 - What you expected instead
 
-For false positives, the score breakdown is the important part — it tells me
+For false positives, the score breakdown is the important part: it tells me
 exactly which rule misfired.
 
 ## Setting up
@@ -68,11 +68,11 @@ or `null` out. To add one:
 ## Adding a brand
 
 `src/core/data/brands.ts`. One token, and every registrable domain that brand
-legitimately serves from — including country variants, or you will create false
+legitimately serves from, including country variants, or you will create false
 positives for real regional sites. Run `npm run evaluate` afterwards.
 
 ## Style
 
 TypeScript, strict mode, ESLint and Prettier defaults. Conventional commits
 (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`). Comments explain *why*, not
-what — the code already says what.
+what. The code already says what.

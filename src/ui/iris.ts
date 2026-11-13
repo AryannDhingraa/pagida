@@ -1,5 +1,5 @@
 /**
- * Iris — Pagida's face.
+ * Iris: Pagida's face.
  *
  * She is drawn entirely in CSS and inline SVG rather than shipped as an image,
  * for one reason: she has to change expression the instant a verdict does, and
@@ -7,7 +7,7 @@
  * enough to run on every page the user opens.
  *
  * The stylesheet lives in this file as a string rather than in a .css file so
- * that there is exactly one source of truth — the extension pages inject it,
+ * that there is exactly one source of truth: the extension pages inject it,
  * and so does the content script, into its closed shadow root.
  */
 
@@ -15,7 +15,7 @@ export type Band = 'clean' | 'caution' | 'suspicious' | 'danger';
 
 /**
  * Every face Iris can pull. Most map to a risk band, but several exist purely
- * to acknowledge something the person did — which is most of what makes her
+ * to acknowledge something the person did, which is most of what makes her
  * feel like a character rather than an icon.
  */
 export type Expression =
@@ -99,7 +99,7 @@ export const IRIS_CSS = `
 @keyframes ir-bob { 0%,100% { translate: 0 0 } 50% { translate: 0 -7% } }
 
 /* A slow wander, for when she is sitting on a page rather than in a fixed slot.
-   Deliberately small and deliberately slow — a mascot that skitters around the
+   Deliberately small and deliberately slow, a mascot that skitters around the
    screen is a mascot people switch off. Roughly a fifteen-second circuit. */
 .iris.ir-drift { animation: ir-wander 15s ease-in-out infinite; }
 @keyframes ir-wander {
@@ -206,7 +206,7 @@ export const IRIS_CSS = `
 .iris[data-face="proud"] .ir-spark-r { opacity: 0 }
 .iris[data-face="proud"] .ir-brow-r { transform: translateY(-4px) }
 
-/* hover — she notices you */
+/* hover: she notices you */
 .iris.ir-interactive:hover .ir-eye { r: 7.6 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -273,7 +273,7 @@ export class Iris {
     }
   }
 
-  /** Recolours the aurora. Independent of expression on purpose — a page can be
+  /** Recolours the aurora. Independent of expression on purpose: a page can be
    *  low-risk while Iris is briefly surprised, and both should be visible. */
   setBand(band: Band): void {
     const [c1, c2, c3] = AURORA[band] ?? AURORA.clean;
@@ -289,7 +289,7 @@ export class Iris {
   }
 
   /** Pull a face for a moment, then go back to whatever she was doing. Used for
-   *  acknowledging a click — reporting a site makes her briefly angry, marking
+   *  acknowledging a click: reporting a site makes her briefly angry, marking
    *  one safe makes her briefly sad. */
   react(expression: Expression, ms = 1600): void {
     if (this.revertTimer) clearTimeout(this.revertTimer);

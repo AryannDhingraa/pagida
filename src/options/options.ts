@@ -1,8 +1,8 @@
 /**
  * Settings, and the first-run welcome.
  *
- * Everything here is written as Iris talking, because the alternative — a page
- * of technical toggles — is exactly what made the previous build unreadable to
+ * Everything here is written as Iris talking, because the alternative, a page
+ * of technical toggles, is exactly what made the previous build unreadable to
  * anyone who was not already a security person.
  *
  * The privacy copy is not marketing. It is the actual list of network calls the
@@ -11,7 +11,7 @@
  */
 import type { Sensitivity } from '../core/score.js';
 import type { UserMark } from '../shared/settings.js';
-import { clearMark, getMarks, getSettings, getStats, setSettings } from '../shared/settings.js';
+import { clearMark, getMarks, getPolicy, getSettings, getStats, setSettings } from '../shared/settings.js';
 import { attachScrollCompanion, Iris, injectIrisCss, type TagAlong } from '../ui/iris.js';
 import { Stepper, STEPPER_CSS, type Step } from '../ui/stepper.js';
 import type { Message } from '../shared/messages.js';
@@ -33,6 +33,10 @@ const controls = {
   useRdap: $<HTMLInputElement>('useRdap'),
   useFeeds: $<HTMLInputElement>('useFeeds'),
   usePagidaService: $<HTMLInputElement>('usePagidaService'),
+  checkEmail: $<HTMLInputElement>('checkEmail'),
+  rememberSignIns: $<HTMLInputElement>('rememberSignIns'),
+  useDmarc: $<HTMLInputElement>('useDmarc'),
+  rememberHistory: $<HTMLInputElement>('rememberHistory'),
   useSafeBrowsing: $<HTMLInputElement>('useSafeBrowsing'),
   safeBrowsingKey: $<HTMLInputElement>('safeBrowsingKey'),
   sbKeyRow: $<HTMLElement>('sbKeyRow'),
@@ -100,7 +104,7 @@ function buildOnboarding(): void {
 
   const steps: Step[] = [
     {
-      title: 'Hello — I am Iris',
+      title: 'Hello, I am Iris',
       render: () => {
         const meet = document.createElement('div');
         meet.className = 'meet';
@@ -124,7 +128,8 @@ function buildOnboarding(): void {
       title: 'What I actually check',
       render: () => stepBody(
         '<b>The address.</b> Is this pretending to be a brand it is not? Is the name one letter off a real one? Was it made up last week?',
-        '<b>The page.</b> Does the login box send your password to a different website? Is this a copy of a real page with the buttons removed?',
+        '<b>The page.</b> Is this a copy of a real sign-in page? Does it send what you type to a stranger? Is it asking for a card, a code or a crypto recovery phrase it has no business asking for?',
+        '<b>Tricks.</b> A fake CAPTCHA that copies a command for you to paste, a fake virus warning with a phone number, a fake pop-up window. I stop the command from working and tell you why.',
         '<b>Its history.</b> Is it already on a public list of known scams? How long has it really existed?',
         'Everything I find gets a score, and every point traces back to one thing I can name. You can disagree with any of it.',
       ),
@@ -135,10 +140,10 @@ function buildOnboarding(): void {
         const wrap = document.createElement('div');
         wrap.append(para('Almost nothing, and you decide. The pages you visit are never sent anywhere.'));
         wrap.append(toggleRow('useRdap', 'How old a website is',
-          'Sends just the domain name — never the full address, never the page.'));
+          'Sends just the domain name, never the full address, never the page.'));
         wrap.append(toggleRow('useFeeds', 'The community scam list',
           'Downloads a public list twice a day, then checks against it here on your machine.'));
-        wrap.append(para('Google Safe Browsing is available too, but it is off until you turn it on — it is the one that would send full addresses to Google.'));
+        wrap.append(para('Google Safe Browsing is available too, but it is off until you turn it on, because it is the one that would send full addresses to Google.'));
         return wrap;
       },
     },
@@ -147,7 +152,7 @@ function buildOnboarding(): void {
       render: () => stepBody(
         'If I get something wrong, tell me. Mark a site as safe and I stop scoring it. Report one and I will warn you every time.',
         'Right-click any link and choose <b>Ask Iris about this link</b> and I will check it without opening it.',
-        'And if you ever want the whole story on a site — who registered it, where it is hosted, whether it can even send email — open the full site report from my popup.',
+        'And if you ever want the whole story on a site (who registered it, where it is hosted, whether it can even send email), open the full site report from my popup.',
       ),
     },
   ];
@@ -175,13 +180,17 @@ async function loadSettings(): Promise<void> {
   controls.useRdap.checked = s.useRdap;
   controls.useFeeds.checked = s.useFeeds;
   controls.usePagidaService.checked = s.usePagidaService;
+  controls.checkEmail.checked = s.checkEmail;
+  controls.rememberSignIns.checked = s.rememberSignIns;
+  controls.useDmarc.checked = s.useDmarc;
+  controls.rememberHistory.checked = s.rememberHistory;
   controls.useSafeBrowsing.checked = s.useSafeBrowsing;
   controls.safeBrowsingKey.value = s.safeBrowsingKey;
   syncKeyRow();
 }
 
 function wire(): void {
-  const bind = (input: HTMLInputElement, key: 'enabled' | 'showBanner' | 'siteReport' | 'useRdap' | 'useFeeds' | 'usePagidaService' | 'useSafeBrowsing') => {
+  const bind = (input: HTMLInputElement, key: 'enabled' | 'showBanner' | 'siteReport' | 'useRdap' | 'useFeeds' | 'usePagidaService' | 'useSafeBrowsing' | 'checkEmail' | 'rememberSignIns' | 'useDmarc' | 'rememberHistory') => {
     input.addEventListener('change', () => {
       void setSettings({ [key]: input.checked });
       if (key === 'enabled') {
@@ -196,6 +205,20 @@ function wire(): void {
   bind(controls.useRdap, 'useRdap');
   bind(controls.useFeeds, 'useFeeds');
   bind(controls.usePagidaService, 'usePagidaService');
+  bind(controls.checkEmail, 'checkEmail');
+  bind(controls.rememberSignIns, 'rememberSignIns');
+  bind(controls.useDmarc, 'useDmarc');
+  bind(controls.rememberHistory, 'rememberHistory');
+  $('forget-history').addEventListener('click', (e) => {
+    e.preventDefault();
+    const button = e.currentTarget as HTMLButtonElement;
+    void chrome.runtime.sendMessage({ type: 'FORGET_HISTORY' } satisfies Message).then(() => { button.textContent = 'Forgotten'; });
+  });
+  $('forget-sign-ins').addEventListener('click', (e) => {
+    e.preventDefault();
+    const button = e.currentTarget as HTMLButtonElement;
+    void chrome.runtime.sendMessage({ type: 'FORGET_SIGN_INS' } satisfies Message).then(() => { button.textContent = 'Forgotten'; });
+  });
   bind(controls.useSafeBrowsing, 'useSafeBrowsing');
   controls.useSafeBrowsing.addEventListener('change', syncKeyRow);
 
@@ -212,7 +235,7 @@ async function renderFeed(): Promise<void> {
   const count = (feedUrls ?? []).length;
   $('feed-status').textContent = count
     ? `${count.toLocaleString()} known scam pages · updated ${ago(feedUpdatedAt ?? 0)}`
-    : 'not loaded yet — press Update now';
+    : 'not loaded yet. Press Update now';
 }
 
 function markRow(mark: UserMark): HTMLLIElement {
@@ -260,7 +283,7 @@ $('refresh-feed').addEventListener('click', () => void (async () => {
   btn.disabled = false;
   btn.textContent = 'Update now';
   if (!res?.ok) {
-    $('feed-status').textContent = 'could not reach the list — try again in a bit';
+    $('feed-status').textContent = 'could not reach the list. Try again in a bit';
     headerIris?.setExpression('sad');
   } else {
     await renderFeed();
@@ -318,3 +341,23 @@ async function init(): Promise<void> {
 }
 
 void init();
+
+// ---------------------------------------------------------------- policy
+
+/** Settings an organisation set by policy: shown, but not changeable here. */
+async function showLocked(): Promise<void> {
+  const { settings } = await getPolicy();
+  for (const key of Object.keys(settings)) {
+    const input = (controls as unknown as Record<string, HTMLElement | undefined>)[key];
+    if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement)) continue;
+    input.disabled = true;
+    const row = input.closest('.row') ?? input.parentElement;
+    if (row && !row.querySelector('.locked')) {
+      const note = document.createElement('small');
+      note.className = 'locked';
+      note.textContent = 'Set by your organisation';
+      row.appendChild(note);
+    }
+  }
+}
+void showLocked();

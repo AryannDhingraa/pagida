@@ -1,12 +1,12 @@
 /**
- * The site report — everything Pagida can find out about a domain.
+ * The site report: everything Pagida can find out about a domain.
  *
  * This is the piece that answers "but what *is* this site?". Every source runs
  * in parallel and every one is independently allowed to fail, so a slow or
  * unreachable provider costs you one row rather than the whole report.
  *
  * Seven public sources, none of which needs a key or an account. What leaves
- * the machine is a domain name and an IP address — never the page you are on.
+ * the machine is a domain name and an IP address, never the page you are on.
  */
 import type { Verdict } from '../core/types.js';
 import { parseHost } from '../core/util/domain.js';
